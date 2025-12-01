@@ -2,8 +2,8 @@
 
 **Project**: JetBrains Debugger MCP Plugin
 **Based on**: design.md v1.0
-**Status**: Planning
-**Last Updated**: 2025-12-01
+**Status**: In Progress (Phase 3 Complete)
+**Last Updated**: 2025-12-02
 
 ---
 
@@ -13,7 +13,7 @@
 |-------|-------------|--------|----------|
 | 1 | Project Setup & Foundation | **Complete** | 8/8 |
 | 2 | Server Infrastructure | **Complete** | 12/12 |
-| 3 | Tool Framework | Not Started | 0/10 |
+| 3 | Tool Framework | **Complete** | 10/10 |
 | 4 | P0 Tools - Core Debugging | Not Started | 0/24 |
 | 5 | Command History Service | Not Started | 0/8 |
 | 6 | GUI - Tool Window | Not Started | 0/16 |
@@ -23,8 +23,8 @@
 | 10 | Testing & Polish | Not Started | 0/12 |
 
 **Total Tasks**: 124
-**Completed**: 20
-**Overall Progress**: 16%
+**Completed**: 30
+**Overall Progress**: 24%
 
 ---
 
@@ -200,58 +200,65 @@
 
 ### Tasks
 
-- [ ] **3.1** Create `tools/McpTool.kt` interface
-  - [ ] Define `name: String` property
-  - [ ] Define `description: String` property
-  - [ ] Define `inputSchema: JsonObject` property
-  - [ ] Define `suspend fun execute(project: Project, arguments: JsonObject): ToolCallResult`
+- [x] **3.1** Create `tools/McpTool.kt` interface
+  - [x] Define `name: String` property
+  - [x] Define `description: String` property
+  - [x] Define `inputSchema: JsonObject` property
+  - [x] Define `suspend fun execute(project: Project, arguments: JsonObject): ToolCallResult`
 
-- [ ] **3.2** Create `tools/AbstractMcpTool.kt`
-  - [ ] Configure Json serializer
-  - [ ] Implement `checkCanceled()` using ProgressManager
-  - [ ] Implement `createSuccessResult(text: String)`
-  - [ ] Implement `createErrorResult(message: String)`
-  - [ ] Implement `createJsonResult<T>(data: T)`
+- [x] **3.2** Create `tools/AbstractMcpTool.kt`
+  - [x] Configure Json serializer
+  - [x] Implement `checkCanceled()` using ProgressManager
+  - [x] Implement `createSuccessResult(text: String)`
+  - [x] Implement `createErrorResult(message: String)`
+  - [x] Implement `createJsonResult<T>(data: T)`
 
-- [ ] **3.3** Add debugger helper methods to AbstractMcpTool
-  - [ ] Implement `getDebuggerManager(project): XDebuggerManager`
-  - [ ] Implement `getCurrentSession(project): XDebugSession?`
-  - [ ] Implement `getSessionById(project, sessionId): XDebugSession?`
-  - [ ] Implement `resolveSession(project, sessionId?): XDebugSession?`
-  - [ ] Add `projectPathProperty()` helper for schema generation
+- [x] **3.3** Add debugger helper methods to AbstractMcpTool
+  - [x] Implement `getDebuggerManager(project): XDebuggerManager`
+  - [x] Implement `getCurrentSession(project): XDebugSession?`
+  - [x] Implement `getSessionById(project, sessionId): XDebugSession?`
+  - [x] Implement `resolveSession(project, sessionId?): XDebugSession?`
+  - [x] Add `projectPathProperty()` helper for schema generation
+  - [x] Add `sessionIdProperty()` helper for schema generation
 
-- [ ] **3.4** Create `tools/ToolRegistry.kt`
-  - [ ] Use ConcurrentHashMap for thread-safe storage
-  - [ ] Implement `register(tool: McpTool)`
-  - [ ] Implement `unregister(toolName: String)`
-  - [ ] Implement `getTool(name: String): McpTool?`
-  - [ ] Implement `getAllTools(): List<McpTool>`
-  - [ ] Implement `getToolDefinitions(): List<ToolDefinition>`
+- [x] **3.4** Create `tools/ToolRegistry.kt`
+  - [x] Use ConcurrentHashMap for thread-safe storage
+  - [x] Implement `register(tool: McpTool)`
+  - [x] Implement `unregister(toolName: String)`
+  - [x] Implement `getTool(name: String): McpTool?`
+  - [x] Implement `getAllTools(): List<McpTool>`
+  - [x] Implement `getToolDefinitions(): List<ToolDefinition>`
 
-- [ ] **3.5** Create `tools/models/SessionModels.kt`
-  - [ ] Define `DebugSessionInfo` data class
-  - [ ] Define `DebugSessionStatus` data class (rich status)
-  - [ ] Define `BreakpointHitInfo` data class
+- [x] **3.5** Create `tools/models/SessionModels.kt`
+  - [x] Define `DebugSessionInfo` data class
+  - [x] Define `DebugSessionStatus` data class (rich status)
+  - [x] Define `BreakpointHitInfo` data class
+  - [x] Define `SourceLocation`, `SourceContext`, `SourceLine` data classes
 
-- [ ] **3.6** Create `tools/models/BreakpointModels.kt`
-  - [ ] Define `BreakpointInfo` data class
-  - [ ] Define `SetBreakpointResult` data class
+- [x] **3.6** Create `tools/models/BreakpointModels.kt`
+  - [x] Define `BreakpointInfo` data class
+  - [x] Define `SetBreakpointResult` data class
+  - [x] Define `RemoveBreakpointResult` data class
 
-- [ ] **3.7** Create `tools/models/StackModels.kt`
-  - [ ] Define `StackFrameInfo` data class
-  - [ ] Define `ThreadInfo` data class
-  - [ ] Define `SourceLocation` data class
+- [x] **3.7** Create `tools/models/StackModels.kt`
+  - [x] Define `StackFrameInfo` data class
+  - [x] Define `ThreadInfo` data class
+  - [x] Define `StackTraceResult`, `ThreadListResult`, `SelectFrameResult` data classes
 
-- [ ] **3.8** Create `tools/models/VariableModels.kt`
-  - [ ] Define `VariableInfo` data class
-  - [ ] Define `WatchInfo` data class
+- [x] **3.8** Create `tools/models/VariableModels.kt`
+  - [x] Define `VariableInfo` data class
+  - [x] Define `WatchInfo` data class
+  - [x] Define `VariablesResult`, `ExpandVariableResult`, `SetVariableResult` data classes
+  - [x] Define `AddWatchResult`, `RemoveWatchResult` data classes
 
-- [ ] **3.9** Create `tools/models/EvaluationModels.kt`
-  - [ ] Define `EvaluationResult` data class
+- [x] **3.9** Create `tools/models/EvaluationModels.kt`
+  - [x] Define `EvaluationResult` data class
+  - [x] Define `EvaluateResponse` data class
 
-- [ ] **3.10** Create `tools/models/RunConfigModels.kt`
-  - [ ] Define `RunConfigurationInfo` data class
-  - [ ] Define `SourceContext` and `SourceLine` data classes
+- [x] **3.10** Create `tools/models/RunConfigModels.kt`
+  - [x] Define `RunConfigurationInfo` data class
+  - [x] Define `RunConfigurationListResult`, `RunConfigurationResult` data classes
+  - [x] Define `ExecutionControlResult`, `StopSessionResult` data classes
 
 **Phase 3 Deliverables**:
 - McpTool interface and AbstractMcpTool base class
