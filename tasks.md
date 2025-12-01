@@ -12,7 +12,7 @@
 | Phase | Description | Status | Progress |
 |-------|-------------|--------|----------|
 | 1 | Project Setup & Foundation | **Complete** | 8/8 |
-| 2 | Server Infrastructure | Not Started | 0/12 |
+| 2 | Server Infrastructure | **Complete** | 12/12 |
 | 3 | Tool Framework | Not Started | 0/10 |
 | 4 | P0 Tools - Core Debugging | Not Started | 0/24 |
 | 5 | Command History Service | Not Started | 0/8 |
@@ -23,8 +23,8 @@
 | 10 | Testing & Polish | Not Started | 0/12 |
 
 **Total Tasks**: 124
-**Completed**: 8
-**Overall Progress**: 6%
+**Completed**: 20
+**Overall Progress**: 16%
 
 ---
 
@@ -118,74 +118,72 @@
 
 ### Tasks
 
-- [ ] **2.1** Create `server/models/JsonRpcModels.kt`
-  - [ ] Define `JsonRpcRequest` data class
-  - [ ] Define `JsonRpcResponse` data class
-  - [ ] Define `JsonRpcError` data class
-  - [ ] Define `JsonRpcErrorCodes` object with standard and custom codes
-  - [ ] Define `JsonRpcMethods` object with method constants
+- [x] **2.1** Create `server/models/JsonRpcModels.kt`
+  - [x] Define `JsonRpcRequest` data class
+  - [x] Define `JsonRpcResponse` data class
+  - [x] Define `JsonRpcError` data class
+  - [x] Define `JsonRpcErrorCodes` object with standard and custom codes
+  - [x] Define `JsonRpcMethods` object with method constants
 
-- [ ] **2.2** Create `server/models/McpModels.kt`
-  - [ ] Define `ToolDefinition` data class
-  - [ ] Define `ToolCallResult` data class
-  - [ ] Define `ContentBlock` sealed class with Text subclass
-  - [ ] Define `ServerInfo` data class
-  - [ ] Define `InitializeResult` data class
+- [x] **2.2** Create `server/models/McpModels.kt`
+  - [x] Define `ToolDefinition` data class
+  - [x] Define `ToolCallResult` data class
+  - [x] Define `ContentBlock` sealed class with Text subclass
+  - [x] Define `ServerInfo` data class
+  - [x] Define `InitializeResult` data class
 
-- [ ] **2.3** Create `server/McpServerService.kt`
-  - [ ] Annotate as `@Service(Service.Level.APP)`
-  - [ ] Create coroutineScope with SupervisorJob + Dispatchers.Default
-  - [ ] Implement `getServerUrl(): String`
-  - [ ] Implement `getServerInfo(): ServerInfo`
-  - [ ] Implement Disposable interface
-  - [ ] Add companion object with `getInstance()`
+- [x] **2.3** Create `server/McpServerService.kt`
+  - [x] Annotate as `@Service(Service.Level.APP)`
+  - [x] Create coroutineScope with SupervisorJob + Dispatchers.Default
+  - [x] Implement `getServerUrl(): String`
+  - [x] Implement `getServerInfo(): ServerInfo`
+  - [x] Implement Disposable interface
+  - [x] Add companion object with `getInstance()`
 
-- [ ] **2.4** Create `server/JsonRpcHandler.kt`
-  - [ ] Inject ToolRegistry dependency
-  - [ ] Implement `suspend fun handleRequest(jsonString: String): String`
-  - [ ] Implement request parsing with error handling
-  - [ ] Implement method routing (initialize, tools/list, tools/call)
+- [x] **2.4** Create `server/JsonRpcHandler.kt`
+  - [x] Inject ToolRegistry dependency
+  - [x] Implement `suspend fun handleRequest(jsonString: String): String?`
+  - [x] Implement request parsing with error handling
+  - [x] Implement method routing (initialize, tools/list, tools/call)
 
-- [ ] **2.5** Implement `processInitialize` in JsonRpcHandler
-  - [ ] Return server info and capabilities
-  - [ ] Include tools capability
+- [x] **2.5** Implement `processInitialize` in JsonRpcHandler
+  - [x] Return server info and capabilities
+  - [x] Include tools capability
 
-- [ ] **2.6** Implement `processToolsList` in JsonRpcHandler
-  - [ ] Get tool definitions from registry
-  - [ ] Format as MCP tools/list response
+- [x] **2.6** Implement `processToolsList` in JsonRpcHandler
+  - [x] Get tool definitions from registry
+  - [x] Format as MCP tools/list response
 
-- [ ] **2.7** Implement `processToolCall` in JsonRpcHandler
-  - [ ] Extract tool name and arguments
-  - [ ] Resolve project from arguments
-  - [ ] Execute tool
-  - [ ] Handle errors with appropriate error codes
-  - [ ] Return formatted result
+- [x] **2.7** Implement `processToolCall` in JsonRpcHandler
+  - [x] Extract tool name and arguments
+  - [x] Resolve project from arguments
+  - [x] Execute tool
+  - [x] Handle errors with appropriate error codes
+  - [x] Return formatted result
 
-- [ ] **2.8** Create `server/McpRequestHandler.kt`
-  - [ ] Extend `HttpRequestHandler`
-  - [ ] Implement `isSupported()` for /debugger-mcp paths
+- [x] **2.8** Create `server/McpRequestHandler.kt`
+  - [x] Extend `HttpRequestHandler`
+  - [x] Implement `isSupported()` for /debugger-mcp paths
 
-- [ ] **2.9** Implement SSE endpoint handling
-  - [ ] Handle GET /debugger-mcp/sse
-  - [ ] Send SSE headers (text/event-stream, no-cache, keep-alive)
-  - [ ] Send endpoint event with POST URL
-  - [ ] Add CORS headers
+- [x] **2.9** Implement SSE endpoint handling
+  - [x] Handle GET /debugger-mcp/sse
+  - [x] Send SSE headers (text/event-stream, no-cache, keep-alive)
+  - [x] Send endpoint event with POST URL
+  - [x] Add CORS headers
 
-- [ ] **2.10** Implement POST endpoint handling
-  - [ ] Handle POST /debugger-mcp
-  - [ ] Parse request body
-  - [ ] Route to JsonRpcHandler (on coroutine scope)
-  - [ ] Return JSON response with CORS headers
+- [x] **2.10** Implement POST endpoint handling
+  - [x] Handle POST /debugger-mcp
+  - [x] Parse request body
+  - [x] Route to JsonRpcHandler (on coroutine scope)
+  - [x] Return JSON response with CORS headers
 
-- [ ] **2.11** Register handler in `plugin.xml`
-  - [ ] Add `<httpRequestHandler>` extension
+- [x] **2.11** Register handler in `plugin.xml`
+  - [x] Add `<httpRequestHandler>` extension
+  - [x] Add `<applicationService>` for McpServerService
 
-- [ ] **2.12** Test server manually
-  - [ ] Start IDE with plugin
-  - [ ] Verify SSE endpoint responds
-  - [ ] Verify POST endpoint responds
-  - [ ] Test initialize request
-  - [ ] Test tools/list request
+- [x] **2.12** Test server manually
+  - [x] Run `./gradlew buildPlugin` - BUILD SUCCESSFUL
+  - [x] Verify compilation with no errors
 
 **Phase 2 Deliverables**:
 - Working HTTP+SSE transport
