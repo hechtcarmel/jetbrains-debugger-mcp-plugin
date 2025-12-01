@@ -2125,20 +2125,60 @@ class SetBreakpointToolTest : BasePlatformTestCase() {
 
 ## Appendix B: Dependencies
 
+### Important: Bundled Libraries
+
+The IntelliJ Platform SDK **bundles** certain libraries that plugins must NOT add separately:
+- **Kotlin Coroutines** - bundled, do NOT add as dependency
+- **Kotlin Standard Library** - bundled, set `kotlin.stdlib.default.dependency = false`
+
+See: https://plugins.jetbrains.com/docs/intellij/kotlin-coroutines.html
+
 ### build.gradle.kts additions
 
 ```kotlin
-dependencies {
-    // Kotlinx Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-
-    // Testing
-    testImplementation("io.mockk:mockk:1.13.8")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+plugins {
+    // ... other plugins
+    alias(libs.plugins.kotlinSerialization) // Required for @Serializable
 }
+
+dependencies {
+    // Kotlinx Serialization - NOT bundled, must add
+    implementation(libs.kotlinx.serialization.json)
+
+    // DO NOT add kotlinx-coroutines - use IntelliJ's bundled version!
+
+    // Testing - exclude coroutines from mockk
+    testImplementation(libs.mockk) {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-bom")
+    }
+}
+```
+
+### gradle/libs.versions.toml
+
+```toml
+[versions]
+kotlinxSerializationJson = "1.7.3"
+mockk = "1.14.6"
+
+[libraries]
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+
+[plugins]
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+```
+
+### gradle.properties additions
+
+```properties
+# Use bundled Kotlin stdlib
+kotlin.stdlib.default.dependency = false
+
+# Bundled plugins for debugger support
+platformBundledPlugins = com.intellij.java
 ```
 
 ---
