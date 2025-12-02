@@ -1,6 +1,6 @@
 # Debugger MCP Server - Tool Reference
 
-This document provides detailed documentation for all 23 MCP tools available in the JetBrains Debugger MCP Server plugin.
+This document provides detailed documentation for all 22 MCP tools available in the JetBrains Debugger MCP Server plugin.
 
 ## Tool Overview
 
@@ -49,12 +49,11 @@ Tools are organized into categories based on functionality:
 | `select_stack_frame` | Select a stack frame |
 | `list_threads` | List all threads |
 
-### Variable Tools (3)
+### Variable Tools (2)
 
 | Tool | Description |
 |------|-------------|
 | `get_variables` | Get frame variables |
-| `expand_variable` | Expand composite variable |
 | `set_variable` | Modify variable value |
 
 ### Navigation Tools (1)
@@ -99,7 +98,6 @@ Tools are organized into categories based on functionality:
   - [list_threads](#list_threads)
 - [Variable Tools](#variable-tools)
   - [get_variables](#get_variables)
-  - [expand_variable](#expand_variable)
   - [set_variable](#set_variable)
 - [Navigation Tools](#navigation-tools)
   - [get_source_context](#get_source_context)
@@ -1157,63 +1155,6 @@ Gets all variables visible in the current stack frame.
       "name": "this",
       "value": "UserService@a1b2c3",
       "type": "com.example.UserService",
-      "hasChildren": true
-    }
-  ]
-}
-```
-
----
-
-### expand_variable
-
-Expands a composite variable to see its children/properties.
-
-**Use when:**
-- Drilling into object fields
-- Exploring collections
-- Viewing nested structures
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `variable_path` | string | Yes | Path to variable (e.g., `this`, `user.address`) |
-| `session_id` | string | No | Session ID |
-| `frame_index` | integer | No | Stack frame index (default: 0) |
-| `project_path` | string | No | Project path |
-
-**Example Request:**
-
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "expand_variable",
-    "arguments": {
-      "variable_path": "this"
-    }
-  }
-}
-```
-
-**Example Response:**
-
-```json
-{
-  "variable": "this",
-  "type": "com.example.UserService",
-  "children": [
-    {
-      "name": "userRepository",
-      "value": "JpaUserRepository@d4e5f6",
-      "type": "com.example.JpaUserRepository",
-      "hasChildren": true
-    },
-    {
-      "name": "logger",
-      "value": "Logger@g7h8i9",
-      "type": "org.slf4j.Logger",
       "hasChildren": true
     }
   ]

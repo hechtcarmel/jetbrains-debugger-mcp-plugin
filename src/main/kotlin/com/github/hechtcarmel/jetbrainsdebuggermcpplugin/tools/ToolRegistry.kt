@@ -21,7 +21,6 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.StopDebug
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack.GetStackTraceTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack.ListThreadsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack.SelectStackFrameTool
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.variable.ExpandVariableTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.variable.GetVariablesTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.variable.SetVariableTool
 import java.util.concurrent.ConcurrentHashMap
@@ -90,9 +89,6 @@ class ToolRegistry {
         register(GetVariablesTool())
 
         // Variable Tools (P1)
-        register(ExpandVariableTool())
-
-        // Variable Tools (P2)
         register(SetVariableTool())
 
         // Navigation Tools (P1)

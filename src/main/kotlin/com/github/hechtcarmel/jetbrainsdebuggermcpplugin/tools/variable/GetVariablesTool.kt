@@ -35,7 +35,7 @@ class GetVariablesTool : AbstractMcpTool() {
 
     override val description = """
         Returns all variables visible in the current (or specified) stack frame.
-        Use to inspect local variables, parameters, and accessible fields. For complex objects, use expand_variable to see their contents.
+        Use to inspect local variables, parameters, and accessible fields. For complex objects, use evaluate_expression to see their contents.
     """.trimIndent()
 
     override val annotations = ToolAnnotations.readOnly("Get Variables")
@@ -53,7 +53,7 @@ class GetVariablesTool : AbstractMcpTool() {
                         putJsonObject("name") { put("type", "string"); put("description", "Variable name") }
                         putJsonObject("value") { put("type", "string"); put("description", "String representation of the value") }
                         putJsonObject("type") { put("type", "string"); put("description", "Variable type name") }
-                        putJsonObject("hasChildren") { put("type", "boolean"); put("description", "True if this variable can be expanded with expand_variable") }
+                        putJsonObject("hasChildren") { put("type", "boolean"); put("description", "True if this variable has child properties") }
                     }
                     put("required", buildJsonArray { add(JsonPrimitive("name")); add(JsonPrimitive("value")); add(JsonPrimitive("type")); add(JsonPrimitive("hasChildren")) })
                 }

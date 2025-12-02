@@ -44,9 +44,8 @@
 - `select_stack_frame` - Select a stack frame by index
 - `list_threads` - List all threads and their states
 
-#### Variable Tools (3 tools)
+#### Variable Tools (2 tools)
 - `get_variables` - Get variables in current frame
-- `expand_variable` - Expand a composite variable to see children
 - `set_variable` - Modify a variable value at runtime
 
 #### Navigation Tools (1 tool)
@@ -70,4 +69,4 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-**Total Tools: 23**
+**Total Tools: 22**

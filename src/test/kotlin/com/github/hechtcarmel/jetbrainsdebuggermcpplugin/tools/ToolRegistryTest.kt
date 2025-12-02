@@ -154,10 +154,10 @@ class ToolRegistryTest {
     }
 
     @Test
-    fun `registerBuiltInTools registers exactly 23 tools`() {
+    fun `registerBuiltInTools registers exactly 22 tools`() {
         registry.registerBuiltInTools()
 
-        assertEquals(23, registry.getToolCount())
+        assertEquals(22, registry.getToolCount())
     }
 
     @Test
@@ -192,9 +192,8 @@ class ToolRegistryTest {
         assertNotNull(registry.getTool("select_stack_frame"))
         assertNotNull(registry.getTool("list_threads"))
 
-        // Variable Tools (3)
+        // Variable Tools (2)
         assertNotNull(registry.getTool("get_variables"))
-        assertNotNull(registry.getTool("expand_variable"))
         assertNotNull(registry.getTool("set_variable"))
 
         // Navigation Tools (1)

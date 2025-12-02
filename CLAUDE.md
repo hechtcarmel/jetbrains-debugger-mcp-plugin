@@ -55,7 +55,6 @@ IMPORTANT: When debugging, prefer using jetbrains-debugger MCP tools to interact
 | `select_stack_frame` | Change stack frame context |
 | `list_threads` | List all threads |
 | `get_variables` | Get variables in current frame |
-| `expand_variable` | Expand composite variable children |
 | `set_variable` | Modify variable value at runtime |
 | `evaluate_expression` | Evaluate expression or code fragment |
 | `get_source_context` | Get source code around a location |

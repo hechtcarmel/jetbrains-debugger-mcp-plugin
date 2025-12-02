@@ -30,7 +30,6 @@ A JetBrains IDE plugin that exposes an **MCP (Model Context Protocol) server**, 
 
 **Variable Inspection**
 - **View Variables** - Inspect local variables, arguments, and object fields
-- **Expand Objects** - Drill into complex data structures
 - **Modify Values** - Change variable values during debugging
 
 **Expression Evaluation**
@@ -49,7 +48,7 @@ Unlike manual debugging, this plugin enables:
 - **Rich Context in Single Calls** - Get variables, stack, and source in one request
 - **Programmatic Breakpoint Control** - Set conditional breakpoints with complex expressions
 - **Cross-IDE Compatibility** - Works with any JetBrains IDE that supports XDebugger
-- **23 Comprehensive Tools** - Full debugging capability through MCP
+- **22 Comprehensive Tools** - Full debugging capability through MCP
 
 Perfect for AI-assisted development workflows where you want your assistant to investigate bugs, validate fixes, or explore code behavior autonomously.
 <!-- Plugin description end -->
@@ -185,7 +184,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ## Available Tools
 
-The plugin provides **23 MCP tools** organized by category:
+The plugin provides **22 MCP tools** organized by category:
 
 ### Run Configuration Tools
 
@@ -235,7 +234,6 @@ The plugin provides **23 MCP tools** organized by category:
 | Tool | Description |
 |------|-------------|
 | `get_variables` | Get all variables visible in current stack frame |
-| `expand_variable` | Drill into object properties/children |
 | `set_variable` | Modify a variable's value during debugging |
 
 ### Navigation Tools

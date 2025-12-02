@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 /**
  * Variable information.
  *
- * Returned by get_variables and expand_variable tools.
+ * Returned by get_variables tool.
  */
 @Serializable
 data class VariableInfo(
@@ -27,18 +27,6 @@ data class VariablesResult(
     val frameIndex: Int,
     val variables: List<VariableInfo>,
     val scope: String? = null
-)
-
-/**
- * Result of expand_variable tool.
- */
-@Serializable
-data class ExpandVariableResult(
-    val sessionId: String,
-    val variablePath: String,
-    val name: String,
-    val children: List<VariableInfo>,
-    val hasMore: Boolean = false
 )
 
 /**
