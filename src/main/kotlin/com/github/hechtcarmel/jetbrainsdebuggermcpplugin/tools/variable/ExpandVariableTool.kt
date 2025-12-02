@@ -33,7 +33,7 @@ class ExpandVariableTool : AbstractMcpTool() {
 
     override val description = """
         Expands a variable to show its children (fields, elements, etc.).
-        Use the variable_id from get_variables or a previous expand_variable call.
+        Use the variable_path from get_variables or a previous expand_variable call.
         Only works on variables where hasChildren is true.
     """.trimIndent()
 
@@ -44,24 +44,20 @@ class ExpandVariableTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("variable_id") {
-                put("type", "string")
-                put("description", "ID of the variable to expand (from get_variables or expand_variable)")
-            }
             putJsonObject("variable_path") {
                 put("type", "string")
-                put("description", "Dot-separated path to variable (e.g., 'myObject.field'). Alternative to variable_id.")
+                put("description", "Dot-separated path to variable (e.g., 'person', 'person.hobbies', 'myObject.field.subField')")
             }
         }
         putJsonArray("required") {
-            add(JsonPrimitive("variable_id"))
+            add(JsonPrimitive("variable_path"))
         }
     }
 
     override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
         val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val variableId = arguments["variable_id"]?.jsonPrimitive?.content
-            ?: return createErrorResult("Missing required parameter: variable_id")
+        val variablePath = arguments["variable_path"]?.jsonPrimitive?.content
+            ?: return createErrorResult("Missing required parameter: variable_path")
 
         val session = resolveSession(project, sessionId)
             ?: return createErrorResult(
@@ -76,20 +72,20 @@ class ExpandVariableTool : AbstractMcpTool() {
         val currentFrame = session.currentStackFrame
             ?: return createErrorResult("No current stack frame")
 
-        val (variableName, variable) = findVariableById(currentFrame, variableId)
-            ?: return createErrorResult("Variable not found: $variableId")
+        val (variableName, variable) = findVariableByPath(currentFrame, variablePath)
+            ?: return createErrorResult("Variable not found at path: $variablePath")
 
         val children = expandVariable(variable)
 
         return createJsonResult(ExpandVariableResult(
             sessionId = getSessionId(session),
-            variableId = variableId,
+            variablePath = variablePath,
             name = variableName,
             children = children
         ))
     }
 
-    private suspend fun findVariableById(frame: XStackFrame, targetId: String): Pair<String, XValue>? {
+    private suspend fun findVariableByName(frame: XStackFrame, targetName: String): Pair<String, XValue>? {
         return withTimeoutOrNull(5000L) {
             suspendCancellableCoroutine { continuation ->
                 var found: Pair<String, XValue>? = null
@@ -99,7 +95,58 @@ class ExpandVariableTool : AbstractMcpTool() {
                         for (i in 0 until children.size()) {
                             val name = children.getName(i)
                             val value = children.getValue(i)
-                            if (value.hashCode().toString() == targetId) {
+                            if (name == targetName) {
+                                found = Pair(name, value)
+                            }
+                        }
+                        if (last) {
+                            continuation.resume(found)
+                        }
+                    }
+
+                    override fun setAlreadySorted(alreadySorted: Boolean) {}
+                    override fun setErrorMessage(errorMessage: String) {
+                        continuation.resume(null)
+                    }
+                    override fun setErrorMessage(errorMessage: String, link: XDebuggerTreeNodeHyperlink?) {
+                        continuation.resume(null)
+                    }
+                    override fun setMessage(message: String, icon: Icon?, attributes: SimpleTextAttributes, link: XDebuggerTreeNodeHyperlink?) {}
+                    override fun tooManyChildren(remaining: Int) {}
+                    override fun tooManyChildren(remaining: Int, addNextChildren: Runnable) {}
+                    override fun isObsolete(): Boolean = false
+                })
+            }
+        }
+    }
+
+    private suspend fun findVariableByPath(frame: XStackFrame, path: String): Pair<String, XValue>? {
+        val parts = path.split(".")
+        if (parts.isEmpty()) return null
+
+        // Find the root variable
+        var current: Pair<String, XValue> = findVariableByName(frame, parts[0]) ?: return null
+
+        // Navigate through the path
+        for (i in 1 until parts.size) {
+            val fieldName = parts[i]
+            current = findChildByName(current.second, fieldName) ?: return null
+        }
+
+        return current
+    }
+
+    private suspend fun findChildByName(parent: XValue, childName: String): Pair<String, XValue>? {
+        return withTimeoutOrNull(5000L) {
+            suspendCancellableCoroutine { continuation ->
+                var found: Pair<String, XValue>? = null
+
+                parent.computeChildren(object : XCompositeNode {
+                    override fun addChildren(children: XValueChildrenList, last: Boolean) {
+                        for (i in 0 until children.size()) {
+                            val name = children.getName(i)
+                            val value = children.getValue(i)
+                            if (name == childName) {
                                 found = Pair(name, value)
                             }
                         }
@@ -196,8 +243,7 @@ class ExpandVariableTool : AbstractMcpTool() {
                     name = name,
                     value = valueText,
                     type = type ?: "unknown",
-                    hasChildren = hasChildren,
-                    id = value.hashCode().toString()
+                    hasChildren = hasChildren
                 ))
             }
 
@@ -231,8 +277,7 @@ class ExpandVariableTool : AbstractMcpTool() {
                     name = name,
                     value = valueText,
                     type = presentation.type ?: "unknown",
-                    hasChildren = hasChildren,
-                    id = value.hashCode().toString()
+                    hasChildren = hasChildren
                 ))
             }
 

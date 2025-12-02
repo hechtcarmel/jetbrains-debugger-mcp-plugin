@@ -172,8 +172,7 @@ class GetVariablesTool : AbstractMcpTool() {
                     name = name,
                     value = valueText,
                     type = type ?: "unknown",
-                    hasChildren = hasChildren,
-                    id = value.hashCode().toString()
+                    hasChildren = hasChildren
                 ))
             }
 
@@ -207,8 +206,7 @@ class GetVariablesTool : AbstractMcpTool() {
                     name = name,
                     value = valueText,
                     type = presentation.type ?: "unknown",
-                    hasChildren = hasChildren,
-                    id = value.hashCode().toString()
+                    hasChildren = hasChildren
                 ))
             }
 

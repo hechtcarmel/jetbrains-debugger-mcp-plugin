@@ -213,8 +213,7 @@ class GetDebugSessionStatusTool : AbstractMcpTool() {
                                         name = name,
                                         value = presentation,
                                         type = type,
-                                        hasChildren = hasChildren,
-                                        id = value.hashCode().toString()
+                                        hasChildren = hasChildren
                                     ))
                                 }
                             }

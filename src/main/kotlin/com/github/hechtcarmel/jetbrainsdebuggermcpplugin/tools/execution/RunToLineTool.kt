@@ -3,6 +3,7 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ExecutionControlResult
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.xdebugger.XDebuggerUtil
@@ -71,13 +72,19 @@ class RunToLineTool : AbstractMcpTool() {
         val position = XDebuggerUtil.getInstance().createPosition(virtualFile, line - 1)
             ?: return createErrorResult("Cannot create position for $filePath:$line")
 
-        session.runToPosition(position, false)
-
-        return createJsonResult(ExecutionControlResult(
-            sessionId = getSessionId(session),
-            action = "run_to_line",
-            status = "executed",
-            message = "Running to $filePath:$line"
-        ))
+        return try {
+            // runToPosition must be called from EDT
+            ApplicationManager.getApplication().invokeAndWait {
+                session.runToPosition(position, false)
+            }
+            createJsonResult(ExecutionControlResult(
+                sessionId = getSessionId(session),
+                action = "run_to_line",
+                status = "executed",
+                message = "Running to $filePath:$line"
+            ))
+        } catch (e: Exception) {
+            createErrorResult("Failed to run to line: ${e.message}")
+        }
     }
 }

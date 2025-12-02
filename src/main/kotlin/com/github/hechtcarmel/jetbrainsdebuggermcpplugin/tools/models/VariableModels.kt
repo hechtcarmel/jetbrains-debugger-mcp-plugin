@@ -13,7 +13,6 @@ data class VariableInfo(
     val value: String,
     val type: String,
     val hasChildren: Boolean = false,
-    val id: String? = null,
     val scope: String? = null,
     val declaredType: String? = null,
     val isStatic: Boolean = false
@@ -51,7 +50,7 @@ data class VariablesResult(
 @Serializable
 data class ExpandVariableResult(
     val sessionId: String,
-    val variableId: String,
+    val variablePath: String,
     val name: String,
     val children: List<VariableInfo>,
     val hasMore: Boolean = false

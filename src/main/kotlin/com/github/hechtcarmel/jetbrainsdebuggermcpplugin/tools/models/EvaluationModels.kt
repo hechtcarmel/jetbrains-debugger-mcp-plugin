@@ -13,7 +13,6 @@ data class EvaluationResult(
     val value: String,
     val type: String,
     val hasChildren: Boolean = false,
-    val id: String? = null,
     val error: String? = null
 )
 

@@ -26,7 +26,9 @@ class SetExceptionBreakpointTool : AbstractMcpTool() {
     override val description = """
         Sets a breakpoint that triggers when a specific exception is thrown.
         Can be configured to break on caught, uncaught, or both types of exceptions.
-        Works with Java and Kotlin exception classes.
+
+        NOTE: This tool only supports Java/Kotlin projects. For other languages
+        (Python, JavaScript, Go, etc.), exception breakpoints are not yet supported.
     """.trimIndent()
 
     override val inputSchema: JsonObject = buildJsonObject {
@@ -69,7 +71,11 @@ class SetExceptionBreakpointTool : AbstractMcpTool() {
             .find { it.id == "java-exception" }
 
         if (exceptionBreakpointType == null) {
-            return createErrorResult("Java exception breakpoints are not available (Java debugger not loaded)")
+            return createErrorResult(
+                "Exception breakpoints are only supported for Java/Kotlin projects. " +
+                "The Java debugger is not available in this IDE. " +
+                "For Python, JavaScript, Go, and other languages, exception breakpoints are not yet implemented."
+            )
         }
 
         return try {

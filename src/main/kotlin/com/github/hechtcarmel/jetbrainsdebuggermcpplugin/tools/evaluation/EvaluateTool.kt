@@ -148,8 +148,7 @@ class EvaluateTool : AbstractMcpTool() {
                     expression = expression,
                     value = valueText,
                     type = type ?: "unknown",
-                    hasChildren = hasChildren,
-                    id = value.hashCode().toString()
+                    hasChildren = hasChildren
                 ))
             }
 
@@ -183,8 +182,7 @@ class EvaluateTool : AbstractMcpTool() {
                     expression = expression,
                     value = valueText,
                     type = presentation.type ?: "unknown",
-                    hasChildren = hasChildren,
-                    id = value.hashCode().toString()
+                    hasChildren = hasChildren
                 ))
             }
 
