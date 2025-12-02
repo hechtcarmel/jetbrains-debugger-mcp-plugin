@@ -5,16 +5,17 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetVariableResult
 import com.intellij.openapi.project.Project
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.frame.XCompositeNode
 import com.intellij.xdebugger.frame.XDebuggerTreeNodeHyperlink
 import com.intellij.xdebugger.frame.XFullValueEvaluator
 import com.intellij.xdebugger.frame.XStackFrame
 import com.intellij.xdebugger.frame.XValue
 import com.intellij.xdebugger.frame.XValueChildrenList
-import com.intellij.xdebugger.frame.XValueModifier
 import com.intellij.xdebugger.frame.XValueNode
 import com.intellij.xdebugger.frame.XValuePlace
 import com.intellij.xdebugger.frame.presentation.XValuePresentation
+import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
@@ -80,22 +81,26 @@ class SetVariableTool : AbstractMcpTool() {
         val currentFrame = session.currentStackFrame
             ?: return createErrorResult("No current stack frame")
 
-        val (variable, oldValue, type) = findVariableByName(currentFrame, variableName)
+        // First, get the current value and type of the variable
+        val (_, oldValue, type) = findVariableByName(currentFrame, variableName)
             ?: return createErrorResult("Variable not found: $variableName")
 
-        val modifier = variable.modifier
-            ?: return createErrorResult("Variable '$variableName' cannot be modified (read-only)")
+        // Get the evaluator to execute the assignment
+        val evaluator = currentFrame.evaluator
+            ?: return createErrorResult("No evaluator available - cannot modify variable")
 
-        val setResult = setVariableValue(modifier, newValue)
+        // Use assignment expression to set the variable value
+        val assignmentExpression = "$variableName = $newValue"
+        val setResult = evaluateAssignment(evaluator, assignmentExpression)
 
         return if (setResult.success) {
             createJsonResult(SetVariableResult(
                 sessionId = getSessionId(session),
                 variableName = variableName,
                 oldValue = oldValue,
-                newValue = newValue,
+                newValue = setResult.resultValue ?: newValue,
                 type = type,
-                message = "Variable '$variableName' set to $newValue"
+                message = "Variable '$variableName' set to ${setResult.resultValue ?: newValue}"
             ))
         } else {
             createErrorResult("Failed to set variable: ${setResult.error ?: "unknown error"}")
@@ -110,6 +115,7 @@ class SetVariableTool : AbstractMcpTool() {
 
     private data class SetResult(
         val success: Boolean,
+        val resultValue: String? = null,
         val error: String? = null
     )
 
@@ -214,18 +220,61 @@ class SetVariableTool : AbstractMcpTool() {
         }, XValuePlace.TREE)
     }
 
-    private suspend fun setVariableValue(modifier: XValueModifier, newValue: String): SetResult {
+    private suspend fun evaluateAssignment(
+        evaluator: XDebuggerEvaluator,
+        assignmentExpression: String
+    ): SetResult {
         return withTimeoutOrNull(5000L) {
             suspendCancellableCoroutine { continuation ->
-                modifier.setValue(newValue, object : XValueModifier.XModificationCallback {
-                    override fun valueModified() {
-                        continuation.resume(SetResult(success = true))
-                    }
+                val xExpression = XExpressionImpl.fromText(assignmentExpression)
 
-                    override fun errorOccurred(errorMessage: String) {
-                        continuation.resume(SetResult(success = false, error = errorMessage))
-                    }
-                })
+                evaluator.evaluate(
+                    xExpression,
+                    object : XDebuggerEvaluator.XEvaluationCallback {
+                        override fun evaluated(result: XValue) {
+                            // Get the result value from the assignment
+                            result.computePresentation(object : XValueNode {
+                                override fun setPresentation(
+                                    icon: Icon?,
+                                    type: String?,
+                                    valueText: String,
+                                    hasChildren: Boolean
+                                ) {
+                                    continuation.resume(SetResult(success = true, resultValue = valueText))
+                                }
+
+                                override fun setPresentation(
+                                    icon: Icon?,
+                                    presentation: XValuePresentation,
+                                    hasChildren: Boolean
+                                ) {
+                                    val valueText = buildString {
+                                        presentation.renderValue(object : XValuePresentation.XValueTextRenderer {
+                                            override fun renderValue(v: String) { append(v) }
+                                            override fun renderStringValue(v: String) { append("\"$v\"") }
+                                            override fun renderNumericValue(v: String) { append(v) }
+                                            override fun renderKeywordValue(v: String) { append(v) }
+                                            override fun renderValue(v: String, key: com.intellij.openapi.editor.colors.TextAttributesKey) { append(v) }
+                                            override fun renderStringValue(v: String, additionalSpecialCharsToHighlight: String?, maxLength: Int) { append("\"$v\"") }
+                                            override fun renderComment(comment: String) {}
+                                            override fun renderSpecialSymbol(symbol: String) { append(symbol) }
+                                            override fun renderError(error: String) { append("ERROR: $error") }
+                                        })
+                                    }
+                                    continuation.resume(SetResult(success = true, resultValue = valueText))
+                                }
+
+                                override fun setFullValueEvaluator(fullValueEvaluator: XFullValueEvaluator) {}
+                                override fun isObsolete(): Boolean = false
+                            }, XValuePlace.TREE)
+                        }
+
+                        override fun errorOccurred(errorMessage: String) {
+                            continuation.resume(SetResult(success = false, error = errorMessage))
+                        }
+                    },
+                    null
+                )
             }
         } ?: SetResult(success = false, error = "Timeout while setting variable value")
     }

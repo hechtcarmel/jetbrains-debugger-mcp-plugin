@@ -9,18 +9,16 @@ import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.impl.XDebugSessionImpl
 import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl
-import com.intellij.xdebugger.impl.ui.tree.nodes.WatchNode
-import com.intellij.xdebugger.impl.ui.tree.nodes.WatchesRootNode
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import kotlin.coroutines.resume
 
 class AddWatchTool : AbstractMcpTool() {
 
@@ -61,45 +59,77 @@ class AddWatchTool : AbstractMcpTool() {
             )
 
         return try {
-            val watchId = addWatch(session, expression)
+            val success = addWatch(session, expression)
 
-            val watchInfo = WatchInfo(
-                id = watchId,
-                expression = expression,
-                value = if (session.isPaused) "evaluating..." else "not evaluated (session running)"
-            )
+            if (success) {
+                val watchInfo = WatchInfo(
+                    id = expression,  // Use expression as ID for consistent lookup
+                    expression = expression,
+                    value = if (session.isPaused) "evaluating..." else "not evaluated (session running)"
+                )
 
-            createJsonResult(AddWatchResult(
-                sessionId = getSessionId(session),
-                watch = watchInfo,
-                message = "Watch expression added: $expression"
-            ))
+                createJsonResult(AddWatchResult(
+                    sessionId = getSessionId(session),
+                    watch = watchInfo,
+                    message = "Watch expression added: $expression"
+                ))
+            } else {
+                createErrorResult("Failed to add watch expression")
+            }
         } catch (e: Exception) {
             createErrorResult("Failed to add watch: ${e.message}")
         }
     }
 
-    private suspend fun addWatch(session: XDebugSession, expression: String): String {
-        return withContext(Dispatchers.Main) {
-            ApplicationManager.getApplication().runReadAction<String> {
-                val sessionImpl = session as? XDebugSessionImpl
-                    ?: throw IllegalStateException("Session is not an XDebugSessionImpl")
-
-                val watchExpression = XExpressionImpl.fromText(expression)
-
-                sessionImpl.sessionTab?.watchesView?.let { watchesView ->
+    private suspend fun addWatch(session: XDebugSession, expression: String): Boolean {
+        return withTimeoutOrNull(3000L) {
+            suspendCancellableCoroutine { continuation ->
+                ApplicationManager.getApplication().invokeLater {
                     try {
-                        val addWatchMethod = watchesView.javaClass.methods.find {
-                            it.name == "addWatchExpression" && it.parameterCount == 1
+                        val sessionImpl = session as? XDebugSessionImpl
+                        if (sessionImpl == null) {
+                            continuation.resume(false)
+                            return@invokeLater
                         }
-                        addWatchMethod?.invoke(watchesView, watchExpression)
+
+                        val watchExpression = XExpressionImpl.fromText(expression)
+                        val watchesView = sessionImpl.sessionTab?.watchesView
+
+                        if (watchesView != null) {
+                            // Find addWatchExpression(XExpression, int, boolean) method
+                            val addMethod = watchesView.javaClass.methods.find {
+                                it.name == "addWatchExpression" &&
+                                        it.parameterCount == 3 &&
+                                        it.parameterTypes[0].name.contains("XExpression")
+                            }
+
+                            if (addMethod != null) {
+                                addMethod.isAccessible = true
+                                // Add at end (-1), navigate to watch node (true)
+                                addMethod.invoke(watchesView, watchExpression, -1, true)
+                                continuation.resume(true)
+                            } else {
+                                // Fallback: Try 4-parameter version with noDuplicates
+                                val altMethod = watchesView.javaClass.methods.find {
+                                    it.name == "addWatchExpression" &&
+                                            it.parameterCount == 4
+                                }
+                                if (altMethod != null) {
+                                    altMethod.isAccessible = true
+                                    altMethod.invoke(watchesView, watchExpression, -1, true, true)
+                                    continuation.resume(true)
+                                } else {
+                                    continuation.resume(false)
+                                }
+                            }
+                        } else {
+                            continuation.resume(false)
+                        }
                     } catch (e: Exception) {
-                        // Fallback approach
+                        continuation.resume(false)
                     }
                 }
-
-                expression.hashCode().toString()
             }
-        }
+        } ?: false
     }
 }

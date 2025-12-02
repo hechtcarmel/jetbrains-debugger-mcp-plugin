@@ -8,6 +8,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.xdebugger.frame.XCompositeNode
 import com.intellij.xdebugger.frame.XDebuggerTreeNodeHyperlink
+import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XFullValueEvaluator
 import com.intellij.xdebugger.frame.XStackFrame
 import com.intellij.xdebugger.frame.XValue
@@ -70,20 +71,53 @@ class GetVariablesTool : AbstractMcpTool() {
             return createErrorResult("Session must be paused to get variables")
         }
 
-        val currentFrame = session.currentStackFrame
-            ?: return createErrorResult("No current stack frame")
+        // Get the frame at the requested index
+        val frame = if (frameIndex == 0) {
+            session.currentStackFrame
+        } else {
+            getFrameAtIndex(session, frameIndex)
+        } ?: return createErrorResult("No stack frame available at index $frameIndex")
 
-        if (frameIndex != 0) {
-            return createErrorResult("Currently only frame_index 0 is supported")
-        }
-
-        val variables = getVariablesFromFrame(currentFrame)
+        val variables = getVariablesFromFrame(frame)
 
         return createJsonResult(VariablesResult(
             sessionId = getSessionId(session),
             frameIndex = frameIndex,
             variables = variables
         ))
+    }
+
+    private suspend fun getFrameAtIndex(session: com.intellij.xdebugger.XDebugSession, frameIndex: Int): XStackFrame? {
+        val suspendContext = session.suspendContext ?: return null
+        val executionStack = suspendContext.activeExecutionStack ?: return null
+
+        if (frameIndex == 0) {
+            return executionStack.topFrame
+        }
+
+        // Get frames from the execution stack
+        return withTimeoutOrNull(3000L) {
+            suspendCancellableCoroutine { continuation ->
+                val frames = mutableListOf<XStackFrame>()
+
+                // Add top frame first
+                executionStack.topFrame?.let { frames.add(it) }
+
+                executionStack.computeStackFrames(1, object : XExecutionStack.XStackFrameContainer {
+                    override fun addStackFrames(stackFrames: MutableList<out XStackFrame>, last: Boolean) {
+                        frames.addAll(stackFrames)
+                        if (last || frames.size > frameIndex) {
+                            val result = frames.getOrNull(frameIndex)
+                            continuation.resume(result)
+                        }
+                    }
+
+                    override fun errorOccurred(errorMessage: String) {
+                        continuation.resume(frames.getOrNull(frameIndex))
+                    }
+                })
+            }
+        }
     }
 
     private suspend fun getVariablesFromFrame(frame: XStackFrame): List<VariableInfo> {
@@ -146,6 +180,7 @@ class GetVariablesTool : AbstractMcpTool() {
                         link: XDebuggerTreeNodeHyperlink?
                     ) {}
 
+                    @Deprecated("Deprecated in Java")
                     override fun tooManyChildren(remaining: Int) {}
 
                     override fun tooManyChildren(remaining: Int, addNextChildren: Runnable) {}
