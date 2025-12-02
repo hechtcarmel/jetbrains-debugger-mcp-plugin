@@ -1,52 +1,207 @@
-# jetbrains-debugger-mcp-plugin
+# JetBrains Debugger MCP Plugin
 
 ![Build](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/workflows/Build/badge.svg)
 [![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 
-## Template ToDo list
-- [x] Create a new [IntelliJ Platform Plugin Template][template] project.
-- [ ] Get familiar with the [template documentation][template].
-- [ ] Adjust the [pluginGroup](./gradle.properties) and [pluginName](./gradle.properties), as well as the [id](./src/main/resources/META-INF/plugin.xml) and [sources package](./src/main/kotlin).
-- [ ] Adjust the plugin description in `README` (see [Tips][docs:plugin-description])
-- [ ] Review the [Legal Agreements](https://plugins.jetbrains.com/docs/marketplace/legal-agreements.html?from=IJPluginTemplate).
-- [ ] [Publish a plugin manually](https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate) for the first time.
-- [ ] Set the `MARKETPLACE_ID` in the above README badges. You can obtain it once the plugin is published to JetBrains Marketplace.
-- [ ] Set the [Plugin Signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html?from=IJPluginTemplate) related [secrets](https://github.com/JetBrains/intellij-platform-plugin-template#environment-variables).
-- [ ] Set the [Deployment Token](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html?from=IJPluginTemplate).
-- [ ] Click the <kbd>Watch</kbd> button on the top of the [IntelliJ Platform Plugin Template][template] to be notified about releases containing new features and fixes.
-- [ ] Configure the [CODECOV_TOKEN](https://docs.codecov.com/docs/quick-start) secret for automated test coverage reports on PRs
+Give AI agents full debugger control through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
+Set breakpoints, step through code, inspect variables, and evaluate expressions—all driven by your AI coding assistant.
 
 <!-- Plugin description -->
-This Fancy IntelliJ Platform Plugin is going to be your implementation of the brilliant ideas that you have.
+**Give AI agents full debugger control** through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
+Set breakpoints, step through code, inspect variables, and evaluate expressions—all driven by your AI coding assistant.
 
-This specific section is a source for the [plugin.xml](/src/main/resources/META-INF/plugin.xml) file which will be extracted by the [Gradle](/build.gradle.kts) during the build process.
+### Debug Session Management
+- **Start/Stop Debug Sessions** - Launch any run configuration in debug mode
+- **Session Status** - Get comprehensive debug state in a single call including variables, watches, stack trace, and source context
+- **Multi-Session Support** - Manage multiple concurrent debug sessions
 
-To keep everything working, do not remove `<!-- ... -->` sections. 
+### Breakpoint Management
+- **Line Breakpoints** - Set, remove, and list breakpoints at any location
+- **Conditional Breakpoints** - Add conditions that must be true to pause execution
+- **Exception Breakpoints** - Break on caught or uncaught exceptions
+- **Tracepoints** - Log messages without pausing execution
+
+### Execution Control
+- **Step Over/Into/Out** - Navigate through code line by line
+- **Resume & Pause** - Control execution flow
+- **Run to Line** - Continue execution until a specific line
+
+### Variable Inspection
+- **View Variables** - Inspect local variables, arguments, and object fields
+- **Expand Objects** - Drill into complex data structures
+- **Modify Values** - Change variable values during debugging
+- **Watch Expressions** - Monitor expressions across debug steps
+
+### Expression Evaluation
+- **Evaluate Expressions** - Run arbitrary expressions in the current context
+- **Code Fragments** - Execute multi-line code snippets
+
+### Stack & Thread Navigation
+- **Stack Traces** - View the complete call stack with source locations
+- **Frame Selection** - Switch context to any stack frame
+- **Thread Listing** - See all threads and their states
+
+### Why This Plugin?
+- **AI-Driven Debugging** - Let your AI assistant debug code autonomously
+- **Rich Context** - Single-call status provides variables, stack, watches, and source context
+- **Multi-IDE Support** - Works with any JetBrains IDE that has XDebugger
+- **26 Tools** - Complete debugging capability through MCP
+
+### Supported AI Assistants
+- Claude Code (CLI)
+- Claude Desktop
+- Cursor
+- Windsurf
+- VS Code with MCP extension
+- Any MCP-compatible client
 <!-- Plugin description end -->
+
+## Quick Start
+
+1. Install plugin and restart IDE
+2. Open **Debugger MCP Server** tool window (bottom panel)
+3. Click **"Install on Coding Agents"**
+4. Select your AI assistant and follow the instructions
+5. Ask your AI to set breakpoints and start debugging!
+
+## Example Workflow
+
+Just tell your AI:
+
+> "Debug the calculateTotal function—set a breakpoint at line 42, run the tests in debug mode, and show me the variable values when it pauses."
+
+## Available Tools (26 total)
+
+### Run Configuration Tools
+| Tool | Description |
+|------|-------------|
+| `list_run_configurations` | List all available run configurations |
+| `run_configuration` | Start a run configuration in debug or run mode |
+
+### Debug Session Tools
+| Tool | Description |
+|------|-------------|
+| `list_debug_sessions` | List all active debug sessions |
+| `start_debug_session` | Start a new debug session |
+| `stop_debug_session` | Stop a debug session |
+| `get_debug_session_status` | Get comprehensive session status |
+
+### Breakpoint Tools
+| Tool | Description |
+|------|-------------|
+| `list_breakpoints` | List all breakpoints |
+| `set_breakpoint` | Set a line breakpoint |
+| `remove_breakpoint` | Remove a breakpoint |
+| `set_exception_breakpoint` | Set an exception breakpoint |
+
+### Execution Control Tools
+| Tool | Description |
+|------|-------------|
+| `resume` | Resume execution |
+| `pause` | Pause execution |
+| `step_over` | Step over to next line |
+| `step_into` | Step into function call |
+| `step_out` | Step out of current function |
+| `run_to_line` | Run to a specific line |
+
+### Stack & Thread Tools
+| Tool | Description |
+|------|-------------|
+| `get_stack_trace` | Get current stack trace |
+| `select_stack_frame` | Select a stack frame |
+| `list_threads` | List all threads |
+
+### Variable Tools
+| Tool | Description |
+|------|-------------|
+| `get_variables` | Get variables in current frame |
+| `expand_variable` | Expand a composite variable |
+| `set_variable` | Modify a variable value |
+
+### Watch Tools
+| Tool | Description |
+|------|-------------|
+| `add_watch` | Add a watch expression |
+| `remove_watch` | Remove a watch expression |
+
+### Navigation Tools
+| Tool | Description |
+|------|-------------|
+| `get_source_context` | Get source code around a location |
+
+### Evaluation Tools
+| Tool | Description |
+|------|-------------|
+| `evaluate` | Evaluate an expression |
 
 ## Installation
 
-- Using the IDE built-in plugin system:
+### Using the IDE built-in plugin system
 
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "jetbrains-debugger-mcp-plugin"</kbd> >
-  <kbd>Install</kbd>
+<kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "Debugger MCP Server"</kbd> > <kbd>Install</kbd>
 
-- Using JetBrains Marketplace:
+### Manual Installation
 
-  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID) and install it by clicking the <kbd>Install to ...</kbd> button in case your IDE is running.
+Download the [latest release](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/releases/latest) and install it manually using:
 
-  You can also download the [latest release](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID/versions) from JetBrains Marketplace and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
+<kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
 
-- Manually:
+## Configuration
 
-  Download the [latest release](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/releases/latest) and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
+### Settings
 
+Access plugin settings via <kbd>Settings/Preferences</kbd> > <kbd>Tools</kbd> > <kbd>Debugger MCP Server</kbd>
+
+- **Server Port**: Set a specific port (0 = auto-assign)
+- **Max History Size**: Number of commands to keep in history
+- **Auto-scroll**: Automatically scroll to latest commands
+- **Show Notifications**: Enable/disable notifications
+
+### AI Assistant Configuration
+
+The plugin provides one-click installation for popular AI assistants:
+
+1. Open the **Debugger MCP Server** tool window
+2. Click **"Install on Coding Agents"**
+3. Choose your assistant:
+   - **Claude Code**: Automatic CLI installation
+   - **Claude Desktop**: Copy configuration to clipboard
+   - **Cursor**: Copy configuration to clipboard
+   - **VS Code**: Copy configuration to clipboard
+   - **Windsurf**: Copy configuration to clipboard
+
+## Development
+
+### Building
+
+```bash
+./gradlew build
+```
+
+### Running Tests
+
+```bash
+./gradlew test
+```
+
+### Running in IDE
+
+```bash
+./gradlew runIde
+```
+
+## Architecture
+
+The plugin uses HTTP+SSE transport for MCP communication:
+
+- **SSE Endpoint**: `/debugger-mcp/sse` - Server-sent events for connection
+- **POST Endpoint**: `/debugger-mcp` - JSON-RPC request handling
+
+## License
+
+Apache License 2.0
 
 ---
-Plugin based on the [IntelliJ Platform Plugin Template][template].
 
-[template]: https://github.com/JetBrains/intellij-platform-plugin-template
-[docs:plugin-description]: https://plugins.jetbrains.com/docs/intellij/plugin-user-experience.html#plugin-description-and-presentation
+Plugin based on the [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template).

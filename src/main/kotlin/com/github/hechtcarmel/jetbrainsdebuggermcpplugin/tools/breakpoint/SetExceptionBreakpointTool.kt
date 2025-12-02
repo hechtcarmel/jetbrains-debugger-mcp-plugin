@@ -117,15 +117,16 @@ class SetExceptionBreakpointTool : AbstractMcpTool() {
     ): XBreakpoint<*>? {
         try {
             val createPropertiesMethod = breakpointType.javaClass.getMethod("createProperties")
-            val properties = createPropertiesMethod.invoke(breakpointType) ?: return null
+            val properties: Any = createPropertiesMethod.invoke(breakpointType) ?: return null
 
             setExceptionProperties(properties, exceptionClass, caught, uncaught)
 
-            val addBreakpointMethod = breakpointManager.javaClass.methods.find {
-                it.name == "addBreakpoint" && it.parameterCount == 2
+            val addBreakpointMethod = breakpointManager.javaClass.methods.find { method ->
+                method.name == "addBreakpoint" && method.parameterCount == 2
             } ?: return null
 
-            val breakpoint = addBreakpointMethod.invoke(breakpointManager, breakpointType, properties) as? XBreakpoint<*>
+            val result: Any? = addBreakpointMethod.invoke(breakpointManager, breakpointType, properties)
+            val breakpoint = result as? XBreakpoint<*>
             breakpoint?.isEnabled = enabled
             return breakpoint
         } catch (e: Exception) {

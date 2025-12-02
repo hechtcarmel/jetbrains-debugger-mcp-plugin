@@ -1,5 +1,6 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history
 
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -123,8 +124,11 @@ class CommandHistoryService(private val project: Project) {
     }
 
     private fun getMaxHistorySize(): Int {
-        // TODO: Read from McpSettings when implemented in Phase 9
-        return DEFAULT_MAX_HISTORY_SIZE
+        return try {
+            McpSettings.getInstance().maxHistorySize
+        } catch (e: Exception) {
+            DEFAULT_MAX_HISTORY_SIZE
+        }
     }
 
     private fun notifyListeners(event: CommandHistoryEvent) {
