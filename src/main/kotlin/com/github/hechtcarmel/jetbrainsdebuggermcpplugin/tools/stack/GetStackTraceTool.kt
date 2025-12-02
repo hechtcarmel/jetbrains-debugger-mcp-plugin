@@ -15,6 +15,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
@@ -35,17 +36,17 @@ class GetStackTraceTool : AbstractMcpTool() {
         put("type", "object")
         putJsonObject("properties") {
             putJsonObject("sessionId") { put("type", "string"); put("description", "Debug session ID") }
-            putJsonObject("threadId") { put("type", "string"); put("description", "Thread ID or name") }
+            putJsonObject("threadId") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) }; put("description", "Thread ID or name") }
             putJsonObject("frames") {
                 put("type", "array")
                 putJsonObject("items") {
                     put("type", "object")
                     putJsonObject("properties") {
                         putJsonObject("index") { put("type", "integer"); put("description", "Frame index (0 = current/topmost)") }
-                        putJsonObject("file") { put("type", "string"); put("description", "Absolute path to source file") }
-                        putJsonObject("line") { put("type", "integer"); put("description", "Line number (1-based)") }
-                        putJsonObject("className") { put("type", "string"); put("description", "Fully qualified class name") }
-                        putJsonObject("methodName") { put("type", "string"); put("description", "Method or function name") }
+                        putJsonObject("file") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) }; put("description", "Absolute path to source file") }
+                        putJsonObject("line") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) }; put("description", "Line number (1-based)") }
+                        putJsonObject("className") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) }; put("description", "Fully qualified class name") }
+                        putJsonObject("methodName") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) }; put("description", "Method or function name") }
                         putJsonObject("isCurrent") { put("type", "boolean"); put("description", "True if this is the current frame") }
                         putJsonObject("isLibrary") { put("type", "boolean"); put("description", "True if this frame is in library code") }
                     }

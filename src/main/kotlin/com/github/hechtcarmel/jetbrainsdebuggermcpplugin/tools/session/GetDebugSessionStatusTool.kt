@@ -22,12 +22,14 @@ import com.intellij.xdebugger.frame.presentation.XValuePresentation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import javax.swing.Icon
 import kotlin.coroutines.resume
@@ -55,14 +57,14 @@ class GetDebugSessionStatusTool : AbstractMcpTool() {
             putJsonObject("sessionId") { put("type", "string"); put("description", "Unique identifier for the debug session") }
             putJsonObject("name") { put("type", "string"); put("description", "Display name of the debug session") }
             putJsonObject("state") { put("type", "string"); put("description", "Current state: 'running', 'paused', or 'stopped'") }
-            putJsonObject("pausedReason") { put("type", "string"); put("description", "Why execution paused: 'breakpoint', 'step', 'exception', or 'pause'") }
+            putJsonObject("pausedReason") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) }; put("description", "Why execution paused: 'breakpoint', 'step', 'exception', or 'pause'") }
             putJsonObject("currentLocation") {
-                put("type", "object")
+                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
                 putJsonObject("properties") {
                     putJsonObject("file") { put("type", "string") }
                     putJsonObject("line") { put("type", "integer") }
-                    putJsonObject("className") { put("type", "string") }
-                    putJsonObject("methodName") { put("type", "string") }
+                    putJsonObject("className") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
+                    putJsonObject("methodName") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
                 }
                 put("description", "Current execution location")
             }
@@ -85,20 +87,20 @@ class GetDebugSessionStatusTool : AbstractMcpTool() {
                     put("type", "object")
                     putJsonObject("properties") {
                         putJsonObject("index") { put("type", "integer") }
-                        putJsonObject("file") { put("type", "string") }
-                        putJsonObject("line") { put("type", "integer") }
-                        putJsonObject("className") { put("type", "string") }
-                        putJsonObject("methodName") { put("type", "string") }
+                        putJsonObject("file") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
+                        putJsonObject("line") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
+                        putJsonObject("className") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
+                        putJsonObject("methodName") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
                     }
                 }
                 put("description", "Stack trace summary")
             }
             putJsonObject("sourceContext") {
-                put("type", "object")
+                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
                 put("description", "Source code around the current execution point")
             }
         }
-        put("required", buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("sessionId")); add(kotlinx.serialization.json.JsonPrimitive("name")); add(kotlinx.serialization.json.JsonPrimitive("state")) })
+        put("required", buildJsonArray { add(JsonPrimitive("sessionId")); add(JsonPrimitive("name")); add(JsonPrimitive("state")) })
     }
 
     override val inputSchema: JsonObject = buildJsonObject {

@@ -157,3 +157,70 @@ Tools return structured errors:
 - JetBrains IDE (IntelliJ IDEA, PyCharm, WebStorm, etc.)
 - IDE must have an open project with a debuggable run configuration
 - This plugin must be installed and enabled
+
+---
+
+## Developer Guide: MCP Structured Outputs
+
+When developing tools for this plugin, be aware of the MCP protocol's structured output requirements.
+
+### When `outputSchema` is Defined
+
+If a tool defines an `outputSchema`, the MCP protocol **requires** the response to include a `structuredContent` field containing the actual JSON object (not just text content).
+
+**Error if missing:**
+```
+MCP error -32600: Tool [name] has an output schema but did not return structured content
+```
+
+**Solution:** Use `createJsonResult()` from `AbstractMcpTool` - it automatically populates both `content` (text) and `structuredContent` (JSON object).
+
+### Nullable Fields in Output Schema
+
+When a field can be `null`, the JSON Schema must explicitly allow it using an array of types:
+
+```kotlin
+// Wrong - will fail validation if value is null:
+putJsonObject("className") { put("type", "string") }
+
+// Correct - allows null values:
+putJsonObject("className") {
+    putJsonArray("type") {
+        add(JsonPrimitive("string"))
+        add(JsonPrimitive("null"))
+    }
+}
+```
+
+### Common Nullable Fields
+
+These fields are commonly null and should use `["type", "null"]`:
+- `className` - may be null for synthetic or library frames
+- `methodName` - may be null for lambda expressions
+- `file` - may be null for generated code
+- `line` - may be null when source mapping unavailable
+- `pausedReason` - null when session is running
+- `currentLocation` - null when session is not paused
+
+### Tool Result Pattern
+
+```kotlin
+// For tools WITH outputSchema - uses structuredContent:
+override val outputSchema: JsonObject = buildJsonObject { /* schema */ }
+
+override suspend fun doExecute(...): ToolCallResult {
+    return createJsonResult(MyResultData(...))  // Auto-populates structuredContent
+}
+
+// For tools WITHOUT outputSchema - simpler text response:
+override suspend fun doExecute(...): ToolCallResult {
+    return createSuccessResult("Operation completed")
+}
+```
+
+### Required Imports for Nullable Schemas
+
+```kotlin
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.putJsonArray
+```
