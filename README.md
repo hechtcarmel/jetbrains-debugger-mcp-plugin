@@ -1,8 +1,8 @@
 # Debugger MCP Server
 
 ![Build](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/workflows/Build/badge.svg)
-[![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
+[![Version](https://img.shields.io/jetbrains/plugin/v/29233.svg)](https://plugins.jetbrains.com/plugin/29233)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/29233.svg)](https://plugins.jetbrains.com/plugin/29233)
 
 A JetBrains IDE plugin that exposes an **MCP (Model Context Protocol) server**, giving AI coding assistants full programmatic control over the debugger. Set breakpoints, step through code, inspect variables, and evaluate expressions—all driven autonomously by your AI assistant.
 
@@ -74,7 +74,7 @@ Perfect for AI-assisted development workflows where you want your assistant to i
 
 ### Using JetBrains Marketplace
 
-Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID) and install it by clicking the <kbd>Install to ...</kbd> button.
+Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/29233) and install it by clicking the <kbd>Install to ...</kbd> button.
 
 ### Manual Installation
 
