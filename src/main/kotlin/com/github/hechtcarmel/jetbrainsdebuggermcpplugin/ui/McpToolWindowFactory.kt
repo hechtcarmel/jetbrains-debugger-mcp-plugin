@@ -6,7 +6,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.CopyClientConfi
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.CopyServerUrlAction
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.ExportHistoryAction
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.RefreshAction
-import com.intellij.icons.AllIcons
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.icons.McpIcons
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -46,7 +46,7 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
 
         val installAction = CopyClientConfigAction()
         val installButton = JButton("Install on Coding Agents").apply {
-            icon = AllIcons.FileTypes.Config
+            icon = McpIcons.ToolWindow
             toolTipText = "Copy MCP client configuration to clipboard"
             isFocusable = false
             addActionListener {

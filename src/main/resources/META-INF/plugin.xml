@@ -99,6 +99,17 @@ for detailed documentation and examples.</p>
         <applicationService
             serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.McpServerService"/>
 
+        <!-- Application-level settings service -->
+        <applicationService
+            serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings"/>
+
+        <!-- Settings configurable UI -->
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable"
+            id="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable"
+            displayName="Debugger MCP Server"/>
+
         <!-- Project-level service for command history -->
         <projectService
             serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandHistoryService"/>

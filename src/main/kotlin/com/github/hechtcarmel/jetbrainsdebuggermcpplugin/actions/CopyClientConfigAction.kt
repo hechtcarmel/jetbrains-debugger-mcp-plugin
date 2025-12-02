@@ -1,6 +1,7 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.icons.McpIcons
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.ClientConfigGenerator
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.ClientConfigGenerator.ClientType
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -43,7 +44,7 @@ class CopyClientConfigAction : AnAction() {
     init {
         templatePresentation.text = "Install on Coding Agents"
         templatePresentation.description = "Install MCP server on coding agents or copy configuration"
-        templatePresentation.icon = AllIcons.FileTypes.Config
+        templatePresentation.icon = McpIcons.ToolWindow
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
