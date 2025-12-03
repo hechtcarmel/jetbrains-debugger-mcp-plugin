@@ -11,9 +11,8 @@ class ClientConfigGeneratorTest {
     fun `ClientType has all expected values`() {
         val types = ClientConfigGenerator.ClientType.entries
 
-        assertEquals(5, types.size)
+        assertEquals(4, types.size)
         assertTrue(types.contains(ClientConfigGenerator.ClientType.CLAUDE_CODE))
-        assertTrue(types.contains(ClientConfigGenerator.ClientType.CLAUDE_DESKTOP))
         assertTrue(types.contains(ClientConfigGenerator.ClientType.CURSOR))
         assertTrue(types.contains(ClientConfigGenerator.ClientType.VSCODE))
         assertTrue(types.contains(ClientConfigGenerator.ClientType.WINDSURF))
@@ -22,7 +21,6 @@ class ClientConfigGeneratorTest {
     @Test
     fun `ClientType displayNames are set correctly`() {
         assertEquals("Claude Code (CLI)", ClientConfigGenerator.ClientType.CLAUDE_CODE.displayName)
-        assertEquals("Claude Desktop", ClientConfigGenerator.ClientType.CLAUDE_DESKTOP.displayName)
         assertEquals("Cursor", ClientConfigGenerator.ClientType.CURSOR.displayName)
         assertEquals("VS Code (Generic MCP)", ClientConfigGenerator.ClientType.VSCODE.displayName)
         assertEquals("Windsurf", ClientConfigGenerator.ClientType.WINDSURF.displayName)
@@ -87,14 +85,6 @@ class ClientConfigGeneratorTest {
     }
 
     @Test
-    fun `getConfigLocationHint for Claude Desktop mentions config file`() {
-        val hint = ClientConfigGenerator.getConfigLocationHint(ClientConfigGenerator.ClientType.CLAUDE_DESKTOP)
-
-        assertTrue(hint.contains("claude_desktop_config.json"))
-        assertTrue(hint.contains("macOS") || hint.contains("Windows") || hint.contains("Linux"))
-    }
-
-    @Test
     fun `getConfigLocationHint for Cursor mentions mcp json`() {
         val hint = ClientConfigGenerator.getConfigLocationHint(ClientConfigGenerator.ClientType.CURSOR)
 
@@ -123,7 +113,7 @@ class ClientConfigGeneratorTest {
     fun `getAvailableClients returns all client types`() {
         val clients = ClientConfigGenerator.getAvailableClients()
 
-        assertEquals(5, clients.size)
+        assertEquals(4, clients.size)
         assertEquals(ClientConfigGenerator.ClientType.entries.toList(), clients)
     }
 
@@ -135,23 +125,6 @@ class ClientConfigGeneratorTest {
     }
 
     // Config Format Tests (structure validation without actual server)
-
-    @Test
-    fun `Claude Desktop config format is valid JSON structure`() {
-        // Test the expected format structure
-        val expectedFormat = """
-{
-  "mcpServers": {
-    "SERVER_NAME": {
-      "url": "SERVER_URL"
-    }
-  }
-}
-        """.trimIndent()
-
-        assertTrue(expectedFormat.contains("mcpServers"))
-        assertTrue(expectedFormat.contains("url"))
-    }
 
     @Test
     fun `Cursor config format is valid JSON structure`() {

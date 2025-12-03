@@ -57,7 +57,7 @@
 #### GUI Components
 - Debugger MCP Server tool window with server status and controls
 - Command history view with filtering and export
-- One-click installation for AI coding assistants (Claude Code, Claude Desktop, Cursor, VS Code, Windsurf)
+- One-click installation for AI coding assistants (Claude Code, Cursor, VS Code, Windsurf)
 - Agent rule tip panel for easy configuration
 - Settings panel for history size, auto-scroll, and notifications
 

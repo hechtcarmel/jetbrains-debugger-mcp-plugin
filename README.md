@@ -125,20 +125,6 @@ Options:
 
 To remove: `claude mcp remove jetbrains-debugger`
 
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "jetbrains-debugger": {
-      "url": "http://localhost:63342/debugger-mcp/sse"
-    }
-  }
-}
-```
-
 ### Cursor
 
 Add to `.cursor/mcp.json` in your project root or `~/.cursor/mcp.json` globally:
