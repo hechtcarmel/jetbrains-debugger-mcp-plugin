@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-12-03
+
+### Added
+- **Gemini CLI support** - Copy configuration for Google's Gemini CLI
+- **Generic MCP Config section** - New popup section with two options:
+  - Standard SSE config for clients with native SSE support
+  - mcp-remote config for clients without SSE support (uses npx mcp-remote bridge)
+
+### Changed
+- Streamlined "Install on Coding Agents" popup with cleaner organization
+- Simplified client list to Claude Code, Gemini CLI, and Cursor
+
+### Removed
+- VS Code and Windsurf client configurations (use Generic MCP Config instead)
+
 ## [1.0.0] - 2025-12-02
 
 ### Added
@@ -57,7 +72,7 @@
 #### GUI Components
 - Debugger MCP Server tool window with server status and controls
 - Command history view with filtering and export
-- One-click installation for AI coding assistants (Claude Code, Cursor, VS Code, Windsurf)
+- One-click installation for AI coding assistants
 - Agent rule tip panel for easy configuration
 - Settings panel for history size, auto-scroll, and notifications
 
