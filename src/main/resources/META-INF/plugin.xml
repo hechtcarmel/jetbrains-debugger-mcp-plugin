@@ -1,15 +1,128 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.github.hechtcarmel.jetbrainsdebuggermcpplugin</id>
-    <name>jetbrains-debugger-mcp-plugin</name>
-    <vendor>hechtcarmel</vendor>
+    <name>Debugger MCP Server</name>
+    <vendor email="hechtcarmel@gmail.com" url="https://github.com/hechtcarmel">hechtcarmel</vendor>
+    <description><![CDATA[
+<p><b>Give AI agents full debugger control</b> through the
+<a href="https://modelcontextprotocol.io">Model Context Protocol (MCP)</a>.
+Set breakpoints, step through code, inspect variables, and evaluate expressions—all driven by your AI coding assistant.</p>
 
+<h3>Debug Session Management</h3>
+<ul>
+    <li><b>Start/Stop Debug Sessions</b> - Launch any run configuration in debug mode</li>
+    <li><b>Session Status</b> - Get comprehensive debug state in a single call including variables, stack trace, and source context</li>
+    <li><b>Multi-Session Support</b> - Manage multiple concurrent debug sessions</li>
+</ul>
+
+<h3>Breakpoint Management</h3>
+<ul>
+    <li><b>Line Breakpoints</b> - Set, remove, and list breakpoints at any location</li>
+    <li><b>Conditional Breakpoints</b> - Add conditions that must be true to pause execution</li>
+    <li><b>Tracepoints</b> - Log messages without pausing execution</li>
+</ul>
+
+<h3>Execution Control</h3>
+<ul>
+    <li><b>Step Over/Into/Out</b> - Navigate through code line by line</li>
+    <li><b>Resume & Pause</b> - Control execution flow</li>
+    <li><b>Run to Line</b> - Continue execution until a specific line</li>
+</ul>
+
+<h3>Variable Inspection</h3>
+<ul>
+    <li><b>View Variables</b> - Inspect local variables, arguments, and object fields</li>
+    <li><b>Expand Objects</b> - Drill into complex data structures</li>
+    <li><b>Modify Values</b> - Change variable values during debugging</li>
+</ul>
+
+<h3>Expression Evaluation</h3>
+<ul>
+    <li><b>Evaluate Expressions</b> - Run arbitrary expressions in the current context</li>
+    <li><b>Code Fragments</b> - Execute multi-line code snippets</li>
+    <li><b>Side Effect Control</b> - Choose whether to allow state modifications</li>
+</ul>
+
+<h3>Stack & Thread Navigation</h3>
+<ul>
+    <li><b>Stack Traces</b> - View the complete call stack with source locations</li>
+    <li><b>Frame Selection</b> - Switch context to any stack frame</li>
+    <li><b>Thread Listing</b> - See all threads and their states</li>
+</ul>
+
+<h3>Why This Plugin?</h3>
+<ul>
+    <li><b>AI-Driven Debugging</b> - Let your AI assistant debug code autonomously</li>
+    <li><b>Rich Context</b> - Single-call status provides variables, stack, and source context</li>
+    <li><b>Multi-IDE Support</b> - Works with any JetBrains IDE that has XDebugger</li>
+    <li><b>Safe by Default</b> - Destructive operations require confirmation</li>
+    <li><b>Zero Configuration</b> - Extends the built-in MCP server infrastructure</li>
+</ul>
+
+<h3>Supported AI Assistants</h3>
+<ul>
+    <li>Claude Code (CLI)</li>
+    <li>Claude Desktop</li>
+    <li>Cursor</li>
+    <li>Windsurf</li>
+    <li>VS Code with MCP extension</li>
+    <li>Any MCP-compatible client</li>
+</ul>
+
+<h3>Quick Start</h3>
+<ol>
+    <li>Install plugin and restart IDE</li>
+    <li>Open <b>Debugger MCP Server</b> tool window (bottom panel)</li>
+    <li>Click <b>"Install on Coding Agents"</b></li>
+    <li>Select your AI assistant and follow the instructions</li>
+    <li>Ask your AI to set breakpoints and start debugging!</li>
+</ol>
+
+<h3>Example Workflow</h3>
+<p>Just tell your AI: <i>"Debug the calculateTotal function—set a breakpoint at line 42, run the tests in debug mode, and show me the variable values when it pauses."</i></p>
+
+<p>See the <a href="https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin">GitHub repository</a>
+for detailed documentation and examples.</p>
+]]>    </description>
+
+    <!-- Required platform dependency -->
     <depends>com.intellij.modules.platform</depends>
-
-    <resource-bundle>messages.MyBundle</resource-bundle>
+    <!-- Required for XDebugger API -->
+    <depends>com.intellij.modules.xdebugger</depends>
+    <!-- Optional Java debugger support -->
+    <depends optional="true" config-file="java-debugger.xml">com.intellij.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.startup.MyProjectActivity" />
+        <!-- Application-level service for MCP server -->
+        <applicationService
+            serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.McpServerService"/>
+
+        <!-- Application-level settings service -->
+        <applicationService
+            serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings"/>
+
+        <!-- Settings configurable UI -->
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable"
+            id="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable"
+            displayName="Debugger MCP Server"/>
+
+        <!-- Project-level service for command history -->
+        <projectService
+            serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandHistoryService"/>
+
+        <!-- HTTP request handler for MCP endpoints -->
+        <httpRequestHandler
+            implementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.McpRequestHandler"/>
+
+        <!-- Tool window for debugger MCP server -->
+        <toolWindow id="Debugger MCP Server"
+                    anchor="bottom"
+                    icon="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.icons.McpIcons.ToolWindow"
+                    factoryClass="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.ui.McpToolWindowFactory"/>
+
+        <!-- Notification group for plugin messages -->
+        <notificationGroup id="Debugger MCP Server" displayType="BALLOON"/>
     </extensions>
 </idea-plugin>

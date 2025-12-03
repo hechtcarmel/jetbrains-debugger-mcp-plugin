@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+  <!-- Debugger MCP Plugin Icon - Light Theme -->
+  <!-- Bug icon with MCP text badge -->
+
+  <!-- Bug body (main oval) -->
+  <ellipse cx="16" cy="18" rx="7" ry="9" fill="#3574F0" stroke="#2954A3" stroke-width="1"/>
+
+  <!-- Bug head -->
+  <circle cx="16" cy="7" r="3.5" fill="#3574F0" stroke="#2954A3" stroke-width="1"/>
+
+  <!-- Bug antennae -->
+  <line x1="13.5" y1="4.5" x2="11" y2="2" stroke="#2954A3" stroke-width="2" stroke-linecap="round"/>
+  <line x1="18.5" y1="4.5" x2="21" y2="2" stroke="#2954A3" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Bug legs - left side -->
+  <line x1="9" y1="13" x2="4" y2="10" stroke="#2954A3" stroke-width="2" stroke-linecap="round"/>
+  <line x1="9" y1="18" x2="3" y2="18" stroke="#2954A3" stroke-width="2" stroke-linecap="round"/>
+  <line x1="9" y1="23" x2="4" y2="26" stroke="#2954A3" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Bug legs - right side -->
+  <line x1="23" y1="13" x2="27" y2="10" stroke="#2954A3" stroke-width="2" stroke-linecap="round"/>
+  <line x1="23" y1="18" x2="28" y2="18" stroke="#2954A3" stroke-width="2" stroke-linecap="round"/>
+  <line x1="23" y1="23" x2="27" y2="26" stroke="#2954A3" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- MCP badge background -->
+  <rect x="18" y="29" width="20" height="9" rx="2" fill="#40B782"/>
+
+  <!-- MCP text -->
+  <text x="28" y="36" font-family="Arial, sans-serif" font-size="7" font-weight="bold" fill="#FFFFFF" text-anchor="middle">MCP</text>
+</svg>

@@ -1,0 +1,4 @@
+<!-- Java-specific debugger extensions -->
+<idea-plugin>
+    <!-- Extensions that require Java plugin will be registered here -->
+</idea-plugin>
