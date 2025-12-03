@@ -11,19 +11,24 @@ class ClientConfigGeneratorTest {
     fun `ClientType has all expected values`() {
         val types = ClientConfigGenerator.ClientType.entries
 
-        assertEquals(4, types.size)
+        assertEquals(3, types.size)
         assertTrue(types.contains(ClientConfigGenerator.ClientType.CLAUDE_CODE))
+        assertTrue(types.contains(ClientConfigGenerator.ClientType.GEMINI_CLI))
         assertTrue(types.contains(ClientConfigGenerator.ClientType.CURSOR))
-        assertTrue(types.contains(ClientConfigGenerator.ClientType.VSCODE))
-        assertTrue(types.contains(ClientConfigGenerator.ClientType.WINDSURF))
     }
 
     @Test
     fun `ClientType displayNames are set correctly`() {
-        assertEquals("Claude Code (CLI)", ClientConfigGenerator.ClientType.CLAUDE_CODE.displayName)
+        assertEquals("Claude Code", ClientConfigGenerator.ClientType.CLAUDE_CODE.displayName)
+        assertEquals("Gemini CLI", ClientConfigGenerator.ClientType.GEMINI_CLI.displayName)
         assertEquals("Cursor", ClientConfigGenerator.ClientType.CURSOR.displayName)
-        assertEquals("VS Code (Generic MCP)", ClientConfigGenerator.ClientType.VSCODE.displayName)
-        assertEquals("Windsurf", ClientConfigGenerator.ClientType.WINDSURF.displayName)
+    }
+
+    @Test
+    fun `ClientType supportsInstallCommand is set correctly`() {
+        assertTrue(ClientConfigGenerator.ClientType.CLAUDE_CODE.supportsInstallCommand)
+        assertFalse(ClientConfigGenerator.ClientType.GEMINI_CLI.supportsInstallCommand)
+        assertFalse(ClientConfigGenerator.ClientType.CURSOR.supportsInstallCommand)
     }
 
     // buildClaudeCodeCommand Tests
@@ -93,18 +98,31 @@ class ClientConfigGeneratorTest {
     }
 
     @Test
-    fun `getConfigLocationHint for VS Code mentions settings`() {
-        val hint = ClientConfigGenerator.getConfigLocationHint(ClientConfigGenerator.ClientType.VSCODE)
+    fun `getConfigLocationHint for Gemini CLI mentions settings json`() {
+        val hint = ClientConfigGenerator.getConfigLocationHint(ClientConfigGenerator.ClientType.GEMINI_CLI)
 
-        assertTrue(hint.contains("settings") || hint.contains("Settings"))
+        assertTrue(hint.contains("settings.json"))
+        assertTrue(hint.contains(".gemini") || hint.contains("gemini"))
+        assertTrue(hint.contains("mcp-remote"))
+    }
+
+    // Hint Methods Tests
+
+    @Test
+    fun `getStandardSseHint mentions SSE transport`() {
+        val hint = ClientConfigGenerator.getStandardSseHint()
+
+        assertTrue(hint.contains("SSE"))
+        assertTrue(hint.contains("transport"))
     }
 
     @Test
-    fun `getConfigLocationHint for Windsurf mentions config path`() {
-        val hint = ClientConfigGenerator.getConfigLocationHint(ClientConfigGenerator.ClientType.WINDSURF)
+    fun `getMcpRemoteHint mentions mcp-remote and stdio`() {
+        val hint = ClientConfigGenerator.getMcpRemoteHint()
 
-        assertTrue(hint.contains("mcp_config.json"))
-        assertTrue(hint.contains("codeium") || hint.contains("windsurf"))
+        assertTrue(hint.contains("mcp-remote"))
+        assertTrue(hint.contains("stdio"))
+        assertTrue(hint.contains("--allow-http"))
     }
 
     // getAvailableClients Tests
@@ -113,7 +131,7 @@ class ClientConfigGeneratorTest {
     fun `getAvailableClients returns all client types`() {
         val clients = ClientConfigGenerator.getAvailableClients()
 
-        assertEquals(4, clients.size)
+        assertEquals(3, clients.size)
         assertEquals(ClientConfigGenerator.ClientType.entries.toList(), clients)
     }
 
@@ -122,6 +140,26 @@ class ClientConfigGeneratorTest {
         val clients = ClientConfigGenerator.getAvailableClients()
 
         assertEquals(ClientConfigGenerator.ClientType.CLAUDE_CODE, clients[0])
+    }
+
+    // getInstallableClients Tests
+
+    @Test
+    fun `getInstallableClients returns only clients with install commands`() {
+        val clients = ClientConfigGenerator.getInstallableClients()
+
+        assertEquals(1, clients.size)
+        assertTrue(clients.contains(ClientConfigGenerator.ClientType.CLAUDE_CODE))
+        assertFalse(clients.contains(ClientConfigGenerator.ClientType.GEMINI_CLI))
+        assertFalse(clients.contains(ClientConfigGenerator.ClientType.CURSOR))
+    }
+
+    @Test
+    fun `getCopyableClients returns all client types`() {
+        val clients = ClientConfigGenerator.getCopyableClients()
+
+        assertEquals(3, clients.size)
+        assertEquals(ClientConfigGenerator.ClientType.entries.toList(), clients)
     }
 
     // Config Format Tests (structure validation without actual server)
@@ -143,36 +181,69 @@ class ClientConfigGeneratorTest {
     }
 
     @Test
-    fun `VS Code config format is valid JSON structure`() {
+    fun `Gemini CLI config format uses mcp-remote`() {
         val expectedFormat = """
 {
-  "mcp.servers": {
+  "mcpServers": {
     "SERVER_NAME": {
-      "transport": "sse",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "SERVER_URL",
+        "--allow-http"
+      ]
+    }
+  }
+}
+        """.trimIndent()
+
+        assertTrue(expectedFormat.contains("mcpServers"))
+        assertTrue(expectedFormat.contains("command"))
+        assertTrue(expectedFormat.contains("npx"))
+        assertTrue(expectedFormat.contains("mcp-remote"))
+        assertTrue(expectedFormat.contains("--allow-http"))
+    }
+
+    @Test
+    fun `Standard SSE config format has url key`() {
+        val expectedFormat = """
+{
+  "mcpServers": {
+    "SERVER_NAME": {
       "url": "SERVER_URL"
     }
   }
 }
         """.trimIndent()
 
-        assertTrue(expectedFormat.contains("mcp.servers"))
-        assertTrue(expectedFormat.contains("transport"))
-        assertTrue(expectedFormat.contains("sse"))
+        assertTrue(expectedFormat.contains("mcpServers"))
+        assertTrue(expectedFormat.contains("url"))
     }
 
     @Test
-    fun `Windsurf config format uses serverUrl key`() {
+    fun `mcp-remote config format has command and args`() {
         val expectedFormat = """
 {
   "mcpServers": {
     "SERVER_NAME": {
-      "serverUrl": "SERVER_URL"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "SERVER_URL",
+        "--allow-http"
+      ]
     }
   }
 }
         """.trimIndent()
 
-        assertTrue(expectedFormat.contains("serverUrl"))
-        assertFalse(expectedFormat.contains("\"url\":"))
+        assertTrue(expectedFormat.contains("command"))
+        assertTrue(expectedFormat.contains("args"))
+        assertTrue(expectedFormat.contains("npx"))
+        assertTrue(expectedFormat.contains("mcp-remote"))
+        assertTrue(expectedFormat.contains("-y"))
+        assertTrue(expectedFormat.contains("--allow-http"))
     }
 }
