@@ -336,16 +336,28 @@ All JetBrains IDEs with XDebugger support:
 
 ## Architecture
 
-The plugin uses HTTP+SSE (Server-Sent Events) transport on the IDE's built-in web server:
+The plugin supports **dual MCP transports** on the IDE's built-in web server:
+
+### SSE Transport (MCP Inspector, spec-compliant clients)
 
 ```
-AI Assistant ──────► GET /debugger-mcp/sse     (establish SSE stream)
-                     ◄── event: endpoint       (receive POST URL)
-             ──────► POST /debugger-mcp        (JSON-RPC requests)
-                     ◄── JSON-RPC response
+AI Assistant ──────► GET /debugger-mcp/sse           (establish SSE stream)
+                     ◄── event: endpoint             (receive POST URL with sessionId)
+             ──────► POST /debugger-mcp?sessionId=x  (JSON-RPC requests)
+                     ◄── HTTP 202 Accepted
+                     ◄── event: message              (JSON-RPC response via SSE)
 ```
 
-This approach:
+### Streamable HTTP Transport (Claude Code, simple clients)
+
+```
+AI Assistant ──────► POST /debugger-mcp              (JSON-RPC requests)
+                     ◄── JSON-RPC response           (immediate HTTP response)
+```
+
+This dual approach:
+- **MCP Inspector compatible** - Full SSE transport per MCP spec (2024-11-05)
+- **Claude Code compatible** - Streamable HTTP for simple request/response
 - Requires no additional ports or processes
 - Works with any MCP-compatible client
 - Automatically adapts to the IDE's server port

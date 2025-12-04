@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-12-04
+
+### Added
+- **Full SSE transport support** - Responses are now sent via SSE `message` events per MCP spec (2024-11-05)
+- **MCP Inspector compatibility** - Works correctly with `npx @modelcontextprotocol/inspector` in SSE mode
+- **Dual transport support** - Supports both SSE transport and Streamable HTTP transport simultaneously
+
 ## [1.1.0] - 2025-12-03
 
 ### Added

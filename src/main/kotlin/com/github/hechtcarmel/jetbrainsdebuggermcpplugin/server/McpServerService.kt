@@ -27,6 +27,7 @@ class McpServerService : Disposable {
 
     private val toolRegistry: ToolRegistry = ToolRegistry()
     private val jsonRpcHandler: JsonRpcHandler
+    private val sseSessionManager: SseSessionManager = SseSessionManager()
 
     /**
      * Coroutine scope for non-blocking tool execution.
@@ -54,6 +55,8 @@ class McpServerService : Disposable {
     fun getToolRegistry(): ToolRegistry = toolRegistry
 
     fun getJsonRpcHandler(): JsonRpcHandler = jsonRpcHandler
+
+    fun getSseSessionManager(): SseSessionManager = sseSessionManager
 
     /**
      * Returns the SSE endpoint URL for MCP connections.
@@ -88,6 +91,7 @@ class McpServerService : Disposable {
 
     override fun dispose() {
         LOG.info("Disposing MCP Server Service")
+        sseSessionManager.closeAllSessions()
         coroutineScope.cancel("McpServerService disposed")
     }
 }

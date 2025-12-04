@@ -9,6 +9,7 @@ object McpConstants {
     // MCP Endpoint paths (HTTP+SSE transport)
     const val MCP_ENDPOINT_PATH = "/debugger-mcp"
     const val SSE_ENDPOINT_PATH = "$MCP_ENDPOINT_PATH/sse"
+    const val SESSION_ID_PARAM = "sessionId"
 
     // JSON-RPC version
     const val JSON_RPC_VERSION = "2.0"
