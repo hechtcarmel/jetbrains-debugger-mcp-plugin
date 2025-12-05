@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [1.2.1] - 2025-12-05
+
+### Fixed
+- **Future-proofing** - Replaced deprecated IntelliJ Platform APIs to ensure compatibility with upcoming IDE versions
+
 ## [1.2.0] - 2025-12-04
 
 ### Added
