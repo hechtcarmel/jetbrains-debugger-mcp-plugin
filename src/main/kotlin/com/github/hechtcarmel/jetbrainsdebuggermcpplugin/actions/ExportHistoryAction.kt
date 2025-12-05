@@ -20,6 +20,7 @@ class ExportHistoryAction : AnAction(
         val project = e.project ?: return
         val historyService = CommandHistoryService.getInstance(project)
 
+        @Suppress("DEPRECATION")
         val descriptor = FileSaverDescriptor(
             "Export Command History",
             "Save command history to file",

@@ -6,8 +6,8 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.ClientConfigGenera
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.ClientConfigGenerator.ClientType
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
-import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.process.ProcessListener
 import com.intellij.icons.AllIcons
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -211,7 +211,7 @@ class CopyClientConfigAction : AnAction() {
                 val handler = OSProcessHandler(commandLine)
                 val output = StringBuilder()
 
-                handler.addProcessListener(object : ProcessAdapter() {
+                handler.addProcessListener(object : ProcessListener {
                     override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
                         output.append(event.text)
                     }
