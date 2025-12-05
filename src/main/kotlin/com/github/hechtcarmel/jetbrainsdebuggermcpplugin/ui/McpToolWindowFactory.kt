@@ -9,8 +9,10 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.RefreshAction
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.icons.McpIcons
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
@@ -56,13 +58,15 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
                         else -> null
                     }
                 }
-                val event = AnActionEvent.createFromAnAction(
+                val event = AnActionEvent.createEvent(
                     installAction,
+                    dataContext,
                     null,
                     ActionPlaces.TOOLWINDOW_CONTENT,
-                    dataContext
+                    ActionUiKind.NONE,
+                    null
                 )
-                installAction.actionPerformed(event)
+                ActionUtil.performActionDumbAwareWithCallbacks(installAction, event)
             }
         }
 
