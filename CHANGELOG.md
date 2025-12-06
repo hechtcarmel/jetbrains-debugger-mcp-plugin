@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [1.2.1] - 2025-12-05
+
+### Fixed
+- **Parameter naming consistency** - Fixed mismatch between schema (`project_path`) and handler (`projectPath`). All tools now consistently use `project_path` as the parameter name for specifying the project root path.
+
 ## [1.2.0] - 2025-12-04
 
 ### Added

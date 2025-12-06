@@ -81,8 +81,8 @@ fun JsonObjectBuilder.enumProperty(name: String, description: String, values: Li
 
 fun JsonObjectBuilder.projectPathProperty() {
     stringProperty(
-        "projectPath",
-        "Absolute path to the project root. Required when multiple projects are open."
+        "project_path",
+        "Absolute path to the project root. Required when multiple projects are open, optional otherwise."
     )
 }
 

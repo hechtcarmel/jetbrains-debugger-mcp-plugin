@@ -101,7 +101,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
 
     fun `test tool call with project path`() = runBlocking {
         val arguments = buildJsonObject {
-            put("projectPath", project.basePath)
+            put("project_path", project.basePath)
         }
         val request = buildToolCallRequest("list_run_configurations", arguments)
         val response = handler.handleRequest(encodeRequest(request))

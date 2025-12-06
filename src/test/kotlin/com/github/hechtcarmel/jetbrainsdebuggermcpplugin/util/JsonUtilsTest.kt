@@ -144,7 +144,7 @@ class JsonUtilsTest {
         }
 
         val properties = schema["properties"]?.jsonObject
-        val projectPathProp = properties?.get("projectPath")?.jsonObject
+        val projectPathProp = properties?.get("project_path")?.jsonObject
 
         assertEquals("string", projectPathProp?.get("type")?.jsonPrimitive?.content)
         assertTrue(projectPathProp?.get("description")?.jsonPrimitive?.content?.contains("project root") == true)

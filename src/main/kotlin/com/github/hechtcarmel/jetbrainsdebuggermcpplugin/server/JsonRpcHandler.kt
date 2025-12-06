@@ -28,14 +28,14 @@ class JsonRpcHandler(
         // Parameter names
         private const val PARAM_NAME = "name"
         private const val PARAM_ARGUMENTS = "arguments"
-        private const val PARAM_PROJECT_PATH = "projectPath"
+        private const val PARAM_PROJECT_PATH = "project_path"
 
         // Error messages
         private const val ERROR_NO_PROJECT_OPEN = "no_project_open"
         private const val ERROR_PROJECT_NOT_FOUND = "project_not_found"
         private const val ERROR_MULTIPLE_PROJECTS = "multiple_projects_open"
         private const val MSG_NO_PROJECT_OPEN = "No project is currently open in the IDE"
-        private const val MSG_MULTIPLE_PROJECTS = "Multiple projects are open. Please specify the 'projectPath' parameter."
+        private const val MSG_MULTIPLE_PROJECTS = "Multiple projects are open. Please specify the 'project_path' parameter."
     }
 
     suspend fun handleRequest(jsonString: String): String {
