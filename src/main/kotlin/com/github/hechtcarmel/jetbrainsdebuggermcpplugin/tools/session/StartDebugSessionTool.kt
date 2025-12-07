@@ -4,12 +4,10 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnot
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.DebugSessionInfo
-import com.intellij.execution.ExecutionManager
+import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
-import com.intellij.execution.runners.ExecutionEnvironmentBuilder
 import com.intellij.openapi.project.Project
-import com.intellij.xdebugger.XDebuggerManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -65,15 +63,10 @@ class StartDebugSessionTool : AbstractMcpTool() {
         val executor = DefaultDebugExecutor.getDebugExecutorInstance()
 
         return try {
-            val environmentBuilder = ExecutionEnvironmentBuilder
-                .createOrNull(executor, settings)
-                ?: return createErrorResult("Cannot create debug environment for: $configName")
-
-            val environment = environmentBuilder.build()
             val sessionCountBefore = getDebuggerManager(project).debugSessions.size
 
             withContext(Dispatchers.Main) {
-                ExecutionManager.getInstance(project).restartRunProfile(environment)
+                ProgramRunnerUtil.executeConfiguration(settings, executor)
             }
 
             // Wait for the session to be created (with timeout)

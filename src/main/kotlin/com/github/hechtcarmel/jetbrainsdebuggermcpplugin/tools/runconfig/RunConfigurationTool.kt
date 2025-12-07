@@ -4,11 +4,10 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnot
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationResult
-import com.intellij.execution.ExecutionManager
+import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.execution.executors.DefaultRunExecutor
-import com.intellij.execution.runners.ExecutionEnvironmentBuilder
 import com.intellij.openapi.project.Project
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -78,14 +77,8 @@ class RunConfigurationTool : AbstractMcpTool() {
         }
 
         return try {
-            val environmentBuilder = ExecutionEnvironmentBuilder
-                .createOrNull(executor, settings)
-                ?: return createErrorResult("Cannot create execution environment for: $configName")
-
-            val environment = environmentBuilder.build()
-
             withContext(Dispatchers.Main) {
-                ExecutionManager.getInstance(project).restartRunProfile(environment)
+                ProgramRunnerUtil.executeConfiguration(settings, executor)
             }
 
             createJsonResult(RunConfigurationResult(
