@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [1.2.2] - 2025-12-07
+
+### Changed
+- **Simplified settings panel** - Removed unused settings that had no effect on plugin behavior.
+
 ## [1.2.1] - 2025-12-05
 
 ### Fixed
@@ -86,7 +91,7 @@
 - Command history view with filtering and export
 - One-click installation for AI coding assistants
 - Agent rule tip panel for easy configuration
-- Settings panel for history size, auto-scroll, and notifications
+- Settings panel for command history size configuration
 
 ### Technical Details
 - Built on IntelliJ Platform SDK 2025.1+
