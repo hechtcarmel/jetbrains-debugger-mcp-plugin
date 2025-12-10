@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [1.3.1] - 2025-12-10
+
+### Changed
+- Replace `localhost` with `127.0.0.1` in server URLs for consistency and compatibility
+
 ## [1.3.0] - 2025-12-07
 
 ### Fixed

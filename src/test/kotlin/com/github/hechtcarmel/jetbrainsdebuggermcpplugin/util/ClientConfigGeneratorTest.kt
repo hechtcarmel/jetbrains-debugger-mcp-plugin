@@ -35,7 +35,7 @@ class ClientConfigGeneratorTest {
 
     @Test
     fun `buildClaudeCodeCommand generates correct command`() {
-        val serverUrl = "http://localhost:63342/debugger-mcp/sse"
+        val serverUrl = "http://127.0.0.1:63342/debugger-mcp/sse"
         val serverName = "jetbrains-debugger"
 
         val command = ClientConfigGenerator.buildClaudeCodeCommand(serverUrl, serverName)
@@ -48,7 +48,7 @@ class ClientConfigGeneratorTest {
 
     @Test
     fun `buildClaudeCodeCommand with custom server name`() {
-        val serverUrl = "http://localhost:8080/mcp"
+        val serverUrl = "http://127.0.0.1:8080/mcp"
         val serverName = "custom-debugger"
 
         val command = ClientConfigGenerator.buildClaudeCodeCommand(serverUrl, serverName)
@@ -60,7 +60,7 @@ class ClientConfigGeneratorTest {
     @Test
     fun `buildClaudeCodeCommand includes 2 devnull redirect for remove`() {
         val command = ClientConfigGenerator.buildClaudeCodeCommand(
-            "http://localhost:63342/debugger-mcp/sse",
+            "http://127.0.0.1:63342/debugger-mcp/sse",
             "test-server"
         )
 
@@ -70,7 +70,7 @@ class ClientConfigGeneratorTest {
     @Test
     fun `buildClaudeCodeCommand separates remove and add with semicolon`() {
         val command = ClientConfigGenerator.buildClaudeCodeCommand(
-            "http://localhost:63342/debugger-mcp/sse",
+            "http://127.0.0.1:63342/debugger-mcp/sse",
             "test-server"
         )
 
