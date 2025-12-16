@@ -57,6 +57,20 @@ dependencies {
     // Kotlinx Serialization - use compileOnly to avoid bundling, use Platform's version at runtime
     compileOnly(libs.kotlinx.serialization.json)
 
+    // Ktor Server (for custom MCP server with configurable port)
+    implementation(libs.ktor.server.core) {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    }
+    implementation(libs.ktor.server.cio) {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    }
+    implementation(libs.ktor.server.cors) {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    }
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.opentest4j)

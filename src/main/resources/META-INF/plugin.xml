@@ -112,9 +112,8 @@ for detailed documentation and examples.</p>
         <projectService
             serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandHistoryService"/>
 
-        <!-- HTTP request handler for MCP endpoints -->
-        <httpRequestHandler
-            implementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.McpRequestHandler"/>
+        <!-- Startup Activity -->
+        <postStartupActivity implementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.startup.McpServerStartupActivity"/>
 
         <!-- Tool window for debugger MCP server -->
         <toolWindow id="Debugger MCP Server"

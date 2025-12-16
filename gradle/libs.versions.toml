@@ -27,6 +27,11 @@ opentest4j = { group = "org.opentest4j", name = "opentest4j", version.ref = "ope
 # MCP Kotlin SDK
 mcp-kotlin-sdk = { group = "io.modelcontextprotocol", name = "kotlin-sdk-jvm", version.ref = "mcpKotlinSdk" }
 
+# Ktor Server
+ktor-server-core = { group = "io.ktor", name = "ktor-server-core-jvm", version.ref = "ktor" }
+ktor-server-cio = { group = "io.ktor", name = "ktor-server-cio-jvm", version.ref = "ktor" }
+ktor-server-cors = { group = "io.ktor", name = "ktor-server-cors-jvm", version.ref = "ktor" }
+
 # Kotlinx Serialization
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 
