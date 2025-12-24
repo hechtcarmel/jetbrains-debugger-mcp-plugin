@@ -200,7 +200,9 @@ class KtorMcpServer(
 
         try {
             val response = jsonRpcHandler.handleRequest(body)
-            call.respondText(response, ContentType.Application.Json)
+            if (response != null){
+                call.respondText(response, ContentType.Application.Json)
+            }
         } catch (e: Exception) {
             LOG.error("Error processing MCP request (Streamable HTTP)", e)
             call.respondText(
@@ -239,9 +241,11 @@ class KtorMcpServer(
         coroutineScope.launch {
             try {
                 val response = jsonRpcHandler.handleRequest(body)
-                val sent = sseSessionManager.sendEvent(sessionId, "message", response)
-                if (!sent) {
-                    LOG.warn("Failed to send response to session $sessionId - session may have closed")
+                if (response != null) {
+                    val sent = sseSessionManager.sendEvent(sessionId, "message", response)
+                    if (!sent) {
+                        LOG.warn("Failed to send response to session $sessionId - session may have closed")
+                    }
                 }
             } catch (e: Exception) {
                 LOG.error("Error processing MCP request (SSE)", e)

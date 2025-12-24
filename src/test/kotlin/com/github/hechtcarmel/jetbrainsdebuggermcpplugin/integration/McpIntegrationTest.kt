@@ -31,7 +31,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
         // Step 1: Initialize
         val initRequest = buildJsonRpcRequest("initialize", 1)
         val initResponse = handler.handleRequest(encodeRequest(initRequest))
-        val initResult = parseResponse(initResponse)
+        val initResult = parseResponse(initResponse!!)
 
         // Should have result (error may be null or missing, focus on result)
         assertNotNull("Initialize should return a result", initResult["result"])
@@ -44,17 +44,13 @@ class McpIntegrationTest : BasePlatformTestCase() {
         // Step 2: Initialized notification
         val initializedRequest = buildJsonRpcRequest("notifications/initialized", 2)
         val initializedResponse = handler.handleRequest(encodeRequest(initializedRequest))
-        val initializedResult = parseResponse(initializedResponse)
-
-        // Initialized returns empty result or result with id
-        assertTrue("Response should have id or result",
-            initializedResult["id"] != null || initializedResult["result"] != null)
+        assertNull(initializedResponse)
     }
 
     fun `test tools discovery`() = runBlocking {
         val request = buildJsonRpcRequest("tools/list", 1)
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         assertNull(result["error"])
 
@@ -72,7 +68,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
     fun `test list run configurations tool`() = runBlocking {
         val request = buildToolCallRequest("list_run_configurations", buildJsonObject {})
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         // Even with no configurations, should return a valid response
         val toolResult = result["result"]?.jsonObject
@@ -82,7 +78,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
     fun `test list debug sessions tool`() = runBlocking {
         val request = buildToolCallRequest("list_debug_sessions", buildJsonObject {})
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         // Should return a valid response (possibly empty sessions list)
         val toolResult = result["result"]?.jsonObject
@@ -92,7 +88,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
     fun `test list breakpoints tool`() = runBlocking {
         val request = buildToolCallRequest("list_breakpoints", buildJsonObject {})
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         // Should return a valid response
         val toolResult = result["result"]?.jsonObject
@@ -105,7 +101,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
         }
         val request = buildToolCallRequest("list_run_configurations", arguments)
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         // Should work with explicit project path
         assertNotNull(result["result"])
@@ -115,7 +111,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
         // Tools like step_over, resume require a paused session
         val request = buildToolCallRequest("step_over", buildJsonObject {})
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         // Should return error because no debug session is active
         val toolResult = result["result"]?.jsonObject
@@ -133,7 +129,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
         }
         val request = buildToolCallRequest("set_breakpoint", arguments)
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         // Should return error for invalid file
         val toolResult = result["result"]?.jsonObject
@@ -144,7 +140,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
     fun `test get variables without debug session`() = runBlocking {
         val request = buildToolCallRequest("get_variables", buildJsonObject {})
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         // Should return error because no debug session
         val toolResult = result["result"]?.jsonObject
@@ -158,7 +154,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
         }
         val request = buildToolCallRequest("evaluate_expression", arguments)
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         // Should return error because no debug session
         val toolResult = result["result"]?.jsonObject
@@ -176,7 +172,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
 
         requests.forEachIndexed { index, request ->
             val response = handler.handleRequest(encodeRequest(request))
-            val result = parseResponse(response)
+            val result = parseResponse(response!!)
             assertNull("Request $index should not have error", result["error"])
         }
     }
@@ -184,7 +180,7 @@ class McpIntegrationTest : BasePlatformTestCase() {
     fun `test server info values`() = runBlocking {
         val request = buildJsonRpcRequest("initialize", 1)
         val response = handler.handleRequest(encodeRequest(request))
-        val result = parseResponse(response)
+        val result = parseResponse(response!!)
 
         val serverInfo = result["result"]?.jsonObject?.get("serverInfo")?.jsonObject
         assertNotNull(serverInfo)

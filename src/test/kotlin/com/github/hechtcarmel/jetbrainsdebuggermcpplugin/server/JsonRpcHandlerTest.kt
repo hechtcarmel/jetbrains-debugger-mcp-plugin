@@ -5,14 +5,12 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ContentBl
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.JsonRpcErrorCodes
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolDefinition
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.McpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolRegistry
 import com.intellij.openapi.project.Project
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import org.junit.Test
 
 class JsonRpcHandlerTest : BasePlatformTestCase() {
 
@@ -27,7 +25,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
 
     fun `test parse error for invalid json`() = runBlocking {
         val response = handler.handleRequest("not valid json")
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNotNull(jsonResponse["error"])
         assertEquals(JsonRpcErrorCodes.PARSE_ERROR, jsonResponse["error"]?.jsonObject?.get("code")?.jsonPrimitive?.int)
@@ -35,7 +33,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
 
     fun `test parse error for incomplete json`() = runBlocking {
         val response = handler.handleRequest("{\"jsonrpc\": \"2.0\"")
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNotNull(jsonResponse["error"])
     }
@@ -51,7 +49,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNull(jsonResponse["error"])
         assertNotNull(jsonResponse["result"])
@@ -62,24 +60,6 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         val serverInfo = result?.get("serverInfo")?.jsonObject
         assertEquals(McpConstants.SERVER_NAME, serverInfo?.get("name")?.jsonPrimitive?.content)
         assertEquals(McpConstants.SERVER_VERSION, serverInfo?.get("version")?.jsonPrimitive?.content)
-    }
-
-    fun `test initialized returns response with id`() = runBlocking {
-        val request = """
-            {
-                "jsonrpc": "2.0",
-                "id": 2,
-                "method": "notifications/initialized",
-                "params": {}
-            }
-        """.trimIndent()
-
-        val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
-
-        // Should have id in response and be valid JSON-RPC
-        assertEquals(2, jsonResponse["id"]?.jsonPrimitive?.int)
-        assertEquals("2.0", jsonResponse["jsonrpc"]?.jsonPrimitive?.content)
     }
 
     fun `test tools list returns registered tools`() = runBlocking {
@@ -96,7 +76,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNull(jsonResponse["error"])
         val result = jsonResponse["result"]?.jsonObject
@@ -116,7 +96,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         val result = jsonResponse["result"]?.jsonObject
         val tools = result?.get("tools")?.jsonArray
@@ -134,7 +114,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNotNull(jsonResponse["error"])
         assertEquals(JsonRpcErrorCodes.INVALID_PARAMS, jsonResponse["error"]?.jsonObject?.get("code")?.jsonPrimitive?.int)
@@ -153,7 +133,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNotNull(jsonResponse["error"])
         val message = jsonResponse["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
@@ -174,7 +154,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNotNull(jsonResponse["error"])
         val message = jsonResponse["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
@@ -192,7 +172,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNotNull(jsonResponse["error"])
         assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, jsonResponse["error"]?.jsonObject?.get("code")?.jsonPrimitive?.int)
@@ -209,7 +189,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertNull(jsonResponse["error"])
         assertEquals(9, jsonResponse["id"]?.jsonPrimitive?.int)
@@ -226,7 +206,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
 
         assertEquals("test-id-123", jsonResponse["id"]?.jsonPrimitive?.content)
     }
@@ -242,7 +222,7 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val response = handler.handleRequest(request)
-        val jsonResponse = Json.parseToJsonElement(response).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
         val result = jsonResponse["result"]?.jsonObject
 
         val capabilities = result?.get("capabilities")?.jsonObject

@@ -38,7 +38,7 @@ class JsonRpcHandler(
         private const val MSG_MULTIPLE_PROJECTS = "Multiple projects are open. Please specify the 'project_path' parameter."
     }
 
-    suspend fun handleRequest(jsonString: String): String {
+    suspend fun handleRequest(jsonString: String): String? {
         val request = try {
             json.decodeFromString<JsonRpcRequest>(jsonString)
         } catch (e: Exception) {
@@ -53,13 +53,13 @@ class JsonRpcHandler(
             createInternalErrorResponse(request.id, e.message ?: "Unknown error")
         }
 
-        return json.encodeToString(response)
+        return response?.let { json.encodeToString(response) }
     }
 
-    private suspend fun routeRequest(request: JsonRpcRequest): JsonRpcResponse {
+    private suspend fun routeRequest(request: JsonRpcRequest): JsonRpcResponse? {
         return when (request.method) {
             JsonRpcMethods.INITIALIZE -> processInitialize(request)
-            JsonRpcMethods.INITIALIZED -> processInitialized(request)
+            JsonRpcMethods.NOTIFICATIONS_INITIALIZED -> null
             JsonRpcMethods.TOOLS_LIST -> processToolsList(request)
             JsonRpcMethods.TOOLS_CALL -> processToolCall(request)
             JsonRpcMethods.PING -> processPing(request)
@@ -83,13 +83,6 @@ class JsonRpcHandler(
         return JsonRpcResponse(
             id = request.id,
             result = json.encodeToJsonElement(result)
-        )
-    }
-
-    private fun processInitialized(request: JsonRpcRequest): JsonRpcResponse {
-        return JsonRpcResponse(
-            id = request.id,
-            result = JsonObject(emptyMap())
         )
     }
 
