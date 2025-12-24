@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+## [3.0.0] - 2025-12-24
+
+### Fixed
+- **MCP spec compliance** - `notifications/initialized` now handled correctly per MCP specification
+  - Method renamed from `initialized` to `notifications/initialized` (per spec)
+  - Notifications no longer receive a response (spec: "receiver MUST NOT send a response")
+
+### Breaking
+- **Claude Code transport type** - Changed `--transport http` to `--transport sse` in generated install commands
+
 ## [2.0.0] - 2025-12-16
 
 ### Added

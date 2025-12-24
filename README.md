@@ -116,7 +116,7 @@ Or for more complex debugging:
 Run this command in your terminal:
 
 ```bash
-claude mcp add --transport http jetbrains-debugger http://127.0.0.1:63342/debugger-mcp/sse --scope user
+claude mcp add --transport sse jetbrains-debugger http://127.0.0.1:63342/debugger-mcp/sse --scope user
 ```
 
 Options:

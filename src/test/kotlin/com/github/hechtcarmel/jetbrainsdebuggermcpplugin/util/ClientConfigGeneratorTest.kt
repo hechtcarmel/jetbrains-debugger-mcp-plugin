@@ -41,7 +41,7 @@ class ClientConfigGeneratorTest {
         val command = ClientConfigGenerator.buildClaudeCodeCommand(serverUrl, serverName)
 
         assertTrue(command.contains("claude mcp remove jetbrains-debugger"))
-        assertTrue(command.contains("claude mcp add --transport http jetbrains-debugger"))
+        assertTrue(command.contains("claude mcp add --transport sse jetbrains-debugger"))
         assertTrue(command.contains(serverUrl))
         assertTrue(command.contains("--scope user"))
     }
@@ -54,7 +54,7 @@ class ClientConfigGeneratorTest {
         val command = ClientConfigGenerator.buildClaudeCodeCommand(serverUrl, serverName)
 
         assertTrue(command.contains("claude mcp remove custom-debugger"))
-        assertTrue(command.contains("claude mcp add --transport http custom-debugger"))
+        assertTrue(command.contains("claude mcp add --transport sse custom-debugger"))
     }
 
     @Test

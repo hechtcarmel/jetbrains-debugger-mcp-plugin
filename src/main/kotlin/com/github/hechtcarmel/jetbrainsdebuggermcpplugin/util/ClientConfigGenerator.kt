@@ -95,7 +95,7 @@ object ClientConfigGenerator {
      */
     internal fun buildClaudeCodeCommand(serverUrl: String, serverName: String): String {
         val removeCmd = "claude mcp remove $serverName 2>/dev/null"
-        val addCmd = "claude mcp add --transport http $serverName $serverUrl --scope user"
+        val addCmd = "claude mcp add --transport sse $serverName $serverUrl --scope user"
         return "$removeCmd ; $addCmd"
     }
 
