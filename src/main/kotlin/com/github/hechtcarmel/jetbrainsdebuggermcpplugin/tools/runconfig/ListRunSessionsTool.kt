@@ -5,33 +5,24 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallR
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunSessionInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunSessionListResult
-import com.intellij.openapi.project.Project
+import com.intellij.execution.ExecutionManager
+import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.process.ProcessHandler
+import com.intellij.openapi.project.Project
+import com.intellij.xdebugger.XDebuggerManager
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
-/**
- * MCP tool for listing all active run sessions in the IDE.
- * 
- * This tool retrieves information about running processes including their IDs,
- * names, and current states. It is useful for discovering available sessions
- * when multiple run sessions are active.
- * 
- * @param project The IntelliJ project context
- */
 class ListRunSessionsTool : AbstractMcpTool() {
 
-    /**
-     * Lists all active run sessions with their IDs, names, and states.
-     * Use to discover session IDs when multiple run sessions are running.
-     */
     override val name = "list_run_sessions"
 
     override val description = """
         Lists all active run sessions with their IDs, names, and states.
+        Returns both debug session IDs (use for get_run_log) and process handler IDs.
         Use to discover session IDs when multiple run sessions are running.
     """.trimIndent()
 
@@ -48,19 +39,62 @@ class ListRunSessionsTool : AbstractMcpTool() {
     }
 
     override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val executionManager = com.intellij.execution.ExecutionManager.getInstance(project)
+        val sessionInfos = mutableListOf<RunSessionInfo>()
+
+        // 1. List debug sessions (these are what start_debug_session returns)
+        val debuggerManager = XDebuggerManager.getInstance(project)
+        val debugSessions = debuggerManager.getDebugSessions()
+
+        for (session in debugSessions) {
+            val debugProcess = session.debugProcess
+            val processHandler = debugProcess?.processHandler
+
+            val sessionId = session.hashCode().toString()
+            val processId = processHandler?.hashCode()?.toString()
+            val osProcessId = getOsProcessId(processHandler)
+
+            val sessionName = try {
+                session.javaClass.getMethod("getName").invoke(session) as? String
+            } catch (e: Exception) {
+                "Debug Session"
+            }
+
+            sessionInfos.add(RunSessionInfo(
+                id = sessionId, // This is the ID to use with get_run_log
+                name = "$sessionName (Debug Session)",
+                state = if (session.isStopped) "stopped" else "running",
+                processId = osProcessId,
+                executorId = "debug",
+                runConfigurationName = sessionName,
+                additionalInfo = mapOf(
+                    "processHandlerId" to processId,
+                    "sessionType" to "debug"
+                )
+            ))
+        }
+
+        // 2. List run sessions (ExecutionManager)
+        val executionManager = ExecutionManager.getInstance(project)
         val runningProcesses: Array<ProcessHandler> = executionManager.getRunningProcesses()
 
-        val sessionInfos: List<RunSessionInfo> = runningProcesses.map { processHandler ->
-            val processId = getProcessId(processHandler)
-            RunSessionInfo(
-                id = processId?.toString() ?: processHandler.hashCode().toString(),
-                name = processHandler.toString(),
-                state = if (processHandler.isProcessTerminated) "stopped" else "running",
-                processId = processId,
-                executorId = null,
-                runConfigurationName = null
-            )
+        for (processHandler in runningProcesses) {
+            val executionId = getExecutionId(processHandler)
+            val runConfiguration = getRunConfiguration(processHandler, executionManager)
+            val osProcessId = getOsProcessId(processHandler)
+            val name = runConfiguration?.name ?: processHandler.toString()
+            val state = if (processHandler.isProcessTerminated) "stopped" else "running"
+
+            sessionInfos.add(RunSessionInfo(
+                id = processHandler.hashCode().toString(), // Use process handler ID for regular runs
+                name = "$name (Run Session)",
+                state = state,
+                processId = osProcessId,
+                executorId = executionId,
+                runConfigurationName = runConfiguration?.name,
+                additionalInfo = mapOf(
+                    "sessionType" to "run"
+                )
+            ))
         }
 
         return createJsonResult(RunSessionListResult(
@@ -69,20 +103,35 @@ class ListRunSessionsTool : AbstractMcpTool() {
         ))
     }
 
-    /**
-     * Retrieves the process ID from a ProcessHandler using reflection.
-     * 
-     * @param processHandler The process handler to extract the ID from
-     * @return The process ID if available, null otherwise
-     */
-    private fun getProcessId(processHandler: ProcessHandler): Long? {
+    private fun getExecutionId(processHandler: ProcessHandler): String? {
         return try {
-            val process = processHandler.javaClass.getMethod("getProcess").invoke(processHandler)
-            if (process is Process) {
-                process.pid()
-            } else {
-                null
-            }
+            val method = processHandler.javaClass.getMethod("getExecutionId")
+            val result = method.invoke(processHandler)
+            if (result is Long) result.toString() else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun getOsProcessId(processHandler: ProcessHandler?): Long? {
+        if (processHandler == null) return null
+        return try {
+            val processField = processHandler.javaClass.getDeclaredField("process")
+            processField.isAccessible = true
+            val process = processField.get(processHandler) as? Process
+            process?.pid()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun getRunConfiguration(
+        processHandler: ProcessHandler,
+        executionManager: ExecutionManager
+    ): RunConfiguration? {
+        return try {
+            val method = processHandler.javaClass.getMethod("getRunConfiguration")
+            method.invoke(processHandler) as? RunConfiguration
         } catch (e: Exception) {
             null
         }

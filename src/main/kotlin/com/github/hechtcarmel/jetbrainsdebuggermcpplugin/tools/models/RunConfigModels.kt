@@ -69,11 +69,20 @@ data class RunSessionInfo(
     val state: String,
     val processId: Long? = null,
     val executorId: String? = null,
-    val runConfigurationName: String? = null
+    val runConfigurationName: String? = null,
+    val additionalInfo: Map<String, String?>
 )
 
 @Serializable
 data class RunSessionListResult(
     val sessions: List<RunSessionInfo>,
     val totalCount: Int
+)
+
+@Serializable
+data class RunLogResult(
+    val sessionId: String,
+    val log: String,
+    val totalLines: Int,
+    val returnedLines: Int
 )

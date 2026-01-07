@@ -157,7 +157,7 @@ class ToolRegistryTest {
     fun `registerBuiltInTools registers exactly 24 tools`() {
         registry.registerBuiltInTools()
 
-        assertEquals(24, registry.getToolCount())
+        assertEquals(25, registry.getToolCount())
     }
 
     @Test
