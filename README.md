@@ -95,7 +95,7 @@ The easiest way to configure your AI assistant:
 1. Open the "Debugger MCP Server" tool window (bottom panel)
 2. Click the prominent **"Install on Coding Agents"** button on the right side of the toolbar
 3. A popup appears with two sections:
-   - **Install Now** - For Claude Code CLI: Runs the installation command automatically
+   - **Install Now** - For Claude Code CLI and Codex CLI: Runs the installation command automatically
    - **Copy Configuration** - For other clients: Copies the JSON config to your clipboard
 4. For "Copy Configuration" clients, paste the config into the appropriate config file
 
@@ -137,6 +137,18 @@ Options:
 - `--scope project` - Adds to current project only
 
 To remove: `claude mcp remove intellij-debugger` (use your IDE's name)
+
+### Codex CLI
+
+The easiest way is to use the **"Install on Coding Agents"** button in the IDE's tool window—it generates the correct command with your IDE-specific server name (e.g., `intellij-debugger`, `pycharm-debugger`).
+
+Or run this command manually in your terminal (replace `<ide>-debugger` with your IDE name):
+
+```bash
+codex mcp add intellij-debugger -- npx -y mcp-remote http://127.0.0.1:63342/debugger-mcp/sse --allow-http
+```
+
+To remove: `codex mcp remove intellij-debugger` (use your IDE's name)
 
 ### Cursor
 

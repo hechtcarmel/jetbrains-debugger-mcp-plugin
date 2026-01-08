@@ -11,8 +11,9 @@ class ClientConfigGeneratorTest {
     fun `ClientType has all expected values`() {
         val types = ClientConfigGenerator.ClientType.entries
 
-        assertEquals(3, types.size)
+        assertEquals(4, types.size)
         assertTrue(types.contains(ClientConfigGenerator.ClientType.CLAUDE_CODE))
+        assertTrue(types.contains(ClientConfigGenerator.ClientType.CODEX_CLI))
         assertTrue(types.contains(ClientConfigGenerator.ClientType.GEMINI_CLI))
         assertTrue(types.contains(ClientConfigGenerator.ClientType.CURSOR))
     }
@@ -20,6 +21,7 @@ class ClientConfigGeneratorTest {
     @Test
     fun `ClientType displayNames are set correctly`() {
         assertEquals("Claude Code", ClientConfigGenerator.ClientType.CLAUDE_CODE.displayName)
+        assertEquals("Codex CLI", ClientConfigGenerator.ClientType.CODEX_CLI.displayName)
         assertEquals("Gemini CLI", ClientConfigGenerator.ClientType.GEMINI_CLI.displayName)
         assertEquals("Cursor", ClientConfigGenerator.ClientType.CURSOR.displayName)
     }
@@ -27,6 +29,7 @@ class ClientConfigGeneratorTest {
     @Test
     fun `ClientType supportsInstallCommand is set correctly`() {
         assertTrue(ClientConfigGenerator.ClientType.CLAUDE_CODE.supportsInstallCommand)
+        assertTrue(ClientConfigGenerator.ClientType.CODEX_CLI.supportsInstallCommand)
         assertFalse(ClientConfigGenerator.ClientType.GEMINI_CLI.supportsInstallCommand)
         assertFalse(ClientConfigGenerator.ClientType.CURSOR.supportsInstallCommand)
     }
@@ -101,6 +104,61 @@ class ClientConfigGeneratorTest {
         )
     }
 
+    // buildCodexCommand Tests
+
+    @Test
+    fun `buildCodexCommand generates correct command format`() {
+        val serverUrl = "http://127.0.0.1:63342/debugger-mcp/sse"
+        val serverName = "intellij-debugger"
+
+        val command = ClientConfigGenerator.buildCodexCommand(serverUrl, serverName)
+
+        val expectedCommand = "codex mcp remove intellij-debugger >/dev/null 2>&1 ; " +
+            "codex mcp add intellij-debugger -- npx -y mcp-remote http://127.0.0.1:63342/debugger-mcp/sse --allow-http"
+
+        assertEquals(
+            expectedCommand,
+            command
+        )
+    }
+
+    @Test
+    fun `buildCodexCommand includes 2 devnull redirect for remove command`() {
+        val command = ClientConfigGenerator.buildCodexCommand(
+            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "webstorm-debugger"
+        )
+
+        assertTrue(command.contains(">/dev/null 2>&1"))
+    }
+
+    @Test
+    fun `buildCodexCommand separates commands with semicolon`() {
+        val command = ClientConfigGenerator.buildCodexCommand(
+            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "goland-debugger"
+        )
+
+        assertTrue(command.contains(" ; "))
+        val parts = command.split(" ; ")
+        assertEquals(2, parts.size)
+    }
+
+    @Test
+    fun `buildCodexCommand remove comes before add`() {
+        val command = ClientConfigGenerator.buildCodexCommand(
+            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "clion-debugger"
+        )
+
+        val removeIndex = command.indexOf("remove")
+        val addIndex = command.indexOf("add")
+
+        assertTrue(
+            removeIndex < addIndex
+        )
+    }
+
     // getConfigLocationHint Tests
 
     @Test
@@ -109,6 +167,14 @@ class ClientConfigGeneratorTest {
 
         assertTrue(hint.contains("terminal") || hint.contains("command"))
         assertTrue(hint.contains("scope"))
+    }
+
+    @Test
+    fun `getConfigLocationHint for Codex CLI mentions terminal`() {
+        val hint = ClientConfigGenerator.getConfigLocationHint(ClientConfigGenerator.ClientType.CODEX_CLI)
+
+        assertTrue(hint.contains("terminal") || hint.contains("command"))
+        assertTrue(hint.contains("codex"))
     }
 
     @Test
@@ -153,7 +219,7 @@ class ClientConfigGeneratorTest {
     fun `getAvailableClients returns all client types`() {
         val clients = ClientConfigGenerator.getAvailableClients()
 
-        assertEquals(3, clients.size)
+        assertEquals(4, clients.size)
         assertEquals(ClientConfigGenerator.ClientType.entries.toList(), clients)
     }
 
@@ -170,8 +236,9 @@ class ClientConfigGeneratorTest {
     fun `getInstallableClients returns only clients with install commands`() {
         val clients = ClientConfigGenerator.getInstallableClients()
 
-        assertEquals(1, clients.size)
+        assertEquals(2, clients.size)
         assertTrue(clients.contains(ClientConfigGenerator.ClientType.CLAUDE_CODE))
+        assertTrue(clients.contains(ClientConfigGenerator.ClientType.CODEX_CLI))
         assertFalse(clients.contains(ClientConfigGenerator.ClientType.GEMINI_CLI))
         assertFalse(clients.contains(ClientConfigGenerator.ClientType.CURSOR))
     }
@@ -180,7 +247,7 @@ class ClientConfigGeneratorTest {
     fun `getCopyableClients returns all client types`() {
         val clients = ClientConfigGenerator.getCopyableClients()
 
-        assertEquals(3, clients.size)
+        assertEquals(4, clients.size)
         assertEquals(ClientConfigGenerator.ClientType.entries.toList(), clients)
     }
 

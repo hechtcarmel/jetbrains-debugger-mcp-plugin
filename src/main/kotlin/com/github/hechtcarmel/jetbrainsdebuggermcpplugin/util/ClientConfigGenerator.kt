@@ -9,6 +9,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
  *
  * This utility generates ready-to-use configuration for:
  * - Claude Code
+ * - Codex CLI
  * - Gemini CLI
  * - Cursor
  *
@@ -37,6 +38,7 @@ object ClientConfigGenerator {
      */
     enum class ClientType(val displayName: String, val supportsInstallCommand: Boolean = false) {
         CLAUDE_CODE("Claude Code", true),
+        CODEX_CLI("Codex CLI", true),
         GEMINI_CLI("Gemini CLI"),
         CURSOR("Cursor")
     }
@@ -58,6 +60,7 @@ object ClientConfigGenerator {
 
         return when (clientType) {
             ClientType.CLAUDE_CODE -> generateClaudeCodeConfig(serverUrl, serverName)
+            ClientType.CODEX_CLI -> generateCodexConfig(serverUrl, serverName)
             ClientType.GEMINI_CLI -> generateGeminiCliConfig(serverUrl, serverName)
             ClientType.CURSOR -> generateCursorConfig(serverUrl, serverName)
         }
@@ -76,6 +79,7 @@ object ClientConfigGenerator {
 
         return when (clientType) {
             ClientType.CLAUDE_CODE -> buildClaudeCodeCommand(serverUrl, serverName)
+            ClientType.CODEX_CLI -> buildCodexCommand(serverUrl, serverName)
             else -> null
         }
     }
@@ -108,6 +112,29 @@ object ClientConfigGenerator {
 
     private fun generateClaudeCodeConfig(serverUrl: String, serverName: String): String {
         return buildClaudeCodeCommand(serverUrl, serverName)
+    }
+
+    /**
+     * Builds the Codex CLI command for reinstalling the MCP server.
+     *
+     * Removes any existing installation first, then adds the server.
+     * The remove command uses 2>/dev/null to suppress errors if the server wasn't installed.
+     * Uses `;` between commands so add runs regardless of remove's exit status.
+     *
+     * This method is internal for testing purposes.
+     *
+     * @param serverUrl The URL of the MCP server
+     * @param serverName The name to register the server as
+     * @return A shell command that removes the current name and reinstalls the MCP server
+     */
+    internal fun buildCodexCommand(serverUrl: String, serverName: String): String {
+        val removeCmd = "codex mcp remove $serverName >/dev/null 2>&1"
+        val addCmd = "codex mcp add $serverName -- npx -y mcp-remote $serverUrl --allow-http"
+        return "$removeCmd ; $addCmd"
+    }
+
+    private fun generateCodexConfig(serverUrl: String, serverName: String): String {
+        return buildCodexCommand(serverUrl, serverName)
     }
 
     /**
@@ -206,6 +233,16 @@ object ClientConfigGenerator {
                 • --scope project: Adds to current project only
 
                 To remove manually: claude mcp remove $serverName
+            """.trimIndent()
+
+            ClientType.CODEX_CLI -> """
+                Runs installation command in your terminal.
+                Automatically handles reinstall if already installed (port may change).
+
+                Uses mcp-remote to bridge SSE to stdio transport.
+                Requires Node.js and npx to be available in your PATH.
+
+                To remove manually: codex mcp remove $serverName
             """.trimIndent()
 
             ClientType.GEMINI_CLI -> """

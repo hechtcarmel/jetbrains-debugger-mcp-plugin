@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-01-07
+
+### Added
+- Codex CLI install option in the "Install on Coding Agents" popup (remove then reinstall)
+
 ## [3.0.1] - 2025-12-28
 
 ### Changed
