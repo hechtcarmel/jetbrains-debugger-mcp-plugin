@@ -40,25 +40,58 @@ class StopDebugSessionTool : AbstractMcpTool() {
 
     override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
         val sessionId = arguments["session_id"]?.jsonPrimitive?.content
+            ?: return createErrorResult("Missing required parameter: session_id")
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
+        // First, try to resolve as a debug session
+        val debugSession = getDebuggerManager(project).debugSessions.find {
+            it.debugProcess.processHandler.hashCode().toString() == sessionId
+        }
+        if (debugSession != null) {
+            val resolvedSessionId = debugSession.debugProcess.processHandler.hashCode().toString()
+            val sessionName = debugSession.sessionName
+            return try {
+                debugSession.stop()
+                createJsonResult(StopSessionResult(
+                    sessionId = resolvedSessionId,
+                    status = "stopped",
+                    message = "Debug session '$sessionName' stopped"
+                ))
+            } catch (e: Exception) {
+                createErrorResult("Failed to stop debug session: ${e.message}")
+            }
+        }
 
-        val resolvedSessionId = getSessionId(session)
-        val sessionName = session.sessionName
+        // If not a debug session, try to resolve as a run session
+        val processHandler = resolveRunSession(project, sessionId)
+            ?: return createErrorResult("Session not found: $sessionId")
+
+        val resolvedSessionId = processHandler.hashCode().toString()
+        val sessionName = processHandler.toString()
 
         return try {
-            session.stop()
-            createJsonResult(StopSessionResult(
-                sessionId = resolvedSessionId,
-                status = "stopped",
-                message = "Debug session '$sessionName' stopped"
-            ))
+            if (processHandler.isProcessTerminated) {
+                createJsonResult(StopSessionResult(
+                    sessionId = resolvedSessionId,
+                    status = "already_stopped",
+                    message = "Run session '$sessionName' was already stopped"
+                ))
+            } else {
+                processHandler.destroyProcess()
+                createJsonResult(StopSessionResult(
+                    sessionId = resolvedSessionId,
+                    status = "stopped",
+                    message = "Run session '$sessionName' stopped"
+                ))
+            }
         } catch (e: Exception) {
-            createErrorResult("Failed to stop session: ${e.message}")
+            createErrorResult("Failed to stop run session: ${e.message}")
+        }
+    }
+
+    private fun resolveRunSession(project: Project, sessionId: String): com.intellij.execution.process.ProcessHandler? {
+        val executionManager = com.intellij.execution.ExecutionManager.getInstance(project)
+        return executionManager.getRunningProcesses().find {
+            it.hashCode().toString() == sessionId
         }
     }
 }

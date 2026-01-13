@@ -3,7 +3,8 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.DebugSessionInfo
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SessionInfo
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.ProcessLogManager
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
@@ -86,12 +87,19 @@ class StartDebugSessionTool : AbstractMcpTool() {
             }
 
             if (newSession != null) {
+                val processHandler = newSession.debugProcess.processHandler
+                if (!ProcessLogManager.hasListener(processHandler.hashCode())) {
+                    println("[StartDebugSessionTool] Attaching listener to process: ${processHandler.hashCode()}")
+                    ProcessLogManager.attachListener(processHandler)
+                }
+
                 createJsonResult(StartDebugSessionResult(
                     status = "started",
                     message = "Debug session started for: $configName",
-                    session = DebugSessionInfo(
-                        id = getSessionId(newSession),
+                    session_info = SessionInfo(
+                        id = processHandler.hashCode().toString(),
                         name = newSession.sessionName,
+                        type = "debug",
                         state = if (newSession.isPaused) "paused" else "running",
                         isCurrent = newSession == getCurrentSession(project),
                         runConfigurationName = configName
@@ -101,7 +109,7 @@ class StartDebugSessionTool : AbstractMcpTool() {
                 createJsonResult(StartDebugSessionResult(
                     status = "starting",
                     message = "Debug session starting for: $configName (may take a moment to initialize)",
-                    session = null
+                    session_info = null
                 ))
             }
         } catch (e: Exception) {
@@ -114,5 +122,5 @@ class StartDebugSessionTool : AbstractMcpTool() {
 data class StartDebugSessionResult(
     val status: String,
     val message: String,
-    val session: DebugSessionInfo?
+    val session_info: SessionInfo?
 )

@@ -3,14 +3,15 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models
 import kotlinx.serialization.Serializable
 
 /**
- * Basic debug session information.
+ * Basic session information for run and debug sessions.
  *
  * Returned by list_debug_sessions and start_debug_session tools.
  */
 @Serializable
-data class DebugSessionInfo(
+data class SessionInfo(
     val id: String,
     val name: String,
+    val type: String,
     val state: String,
     val isCurrent: Boolean,
     val runConfigurationName: String? = null,

@@ -3,7 +3,7 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SessionInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.ProcessLogManager
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
@@ -84,15 +84,23 @@ class RunConfigurationTool : AbstractMcpTool() {
 
             // Attach listener to the newly started process
             val processHandler = attachListenerToNewProcess(project)
-            val sessionId = processHandler?.hashCode()?.toString() ?: "unknown"
+            val sessionId = processHandler?.hashCode()?.toString()
 
-            createJsonResult(RunConfigurationResult(
-                configurationName = configName,
-                mode = mode,
-                status = "started",
-                message = "Started $configName in $mode mode",
-                sessionId = sessionId // Include the session ID (hashCode) for get_run_log
-            ))
+            if (sessionId != null) {
+                createJsonResult(
+                    SessionInfo(
+                        id = sessionId,
+                        name = configName,
+                        type = mode,
+                        state = "running",
+                        isCurrent = false,
+                        runConfigurationName = configName,
+                        processId = getOsProcessId(processHandler)
+                    )
+                )
+            } else {
+                createErrorResult("Failed to attach to process for $configName")
+            }
         } catch (e: Exception) {
             createErrorResult("Failed to start configuration: ${e.message}")
         }
@@ -121,5 +129,17 @@ class RunConfigurationTool : AbstractMcpTool() {
         }
         println("[RunConfigurationTool] Could not find a new process to attach listener to after several attempts.")
         return null
+    }
+
+    private fun getOsProcessId(processHandler: ProcessHandler?): Long? {
+        if (processHandler == null) return null
+        return try {
+            val processField = processHandler.javaClass.getDeclaredField("process")
+            processField.isAccessible = true
+            val process = processField.get(processHandler) as? Process
+            process?.pid()
+        } catch (e: Exception) {
+            null
+        }
     }
 }

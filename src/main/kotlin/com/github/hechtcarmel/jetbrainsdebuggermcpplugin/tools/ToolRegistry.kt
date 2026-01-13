@@ -14,9 +14,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepOve
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.navigation.GetSourceContextTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.GetRunLogTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.ListRunConfigurationsTool
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.ListRunSessionsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.RunConfigurationTool
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.StopRunSessionTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.GetDebugSessionStatusTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.ListDebugSessionsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.StartDebugSessionTool
@@ -58,9 +56,7 @@ class ToolRegistry {
     fun registerBuiltInTools() {
         // Run Configuration Tools
         register(ListRunConfigurationsTool())
-        register(ListRunSessionsTool())
         register(RunConfigurationTool())
-        register(StopRunSessionTool())
         register(GetRunLogTool())
 
         // Debug Session Tools
