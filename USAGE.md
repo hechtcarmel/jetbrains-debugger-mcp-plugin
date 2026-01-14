@@ -6,11 +6,10 @@ This document provides detailed documentation for all 22 MCP tools available in 
 
 Tools are organized into categories based on functionality:
 
-### Run Configuration Tools (5)
+### Run Configuration Tools (2)
 
 | Tool | Description |
 |------|-------------|
-| `stop_run_session` | Stop a run session |
 | `execute_run_configuration` | Execute a run configuration in run or debug mode |
 | `get_run_log` | Get console output from a run session |
 
