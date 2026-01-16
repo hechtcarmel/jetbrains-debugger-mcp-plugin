@@ -10,8 +10,8 @@ Tools are organized into categories based on functionality:
 
 | Tool | Description |
 |------|-------------|
-| `list_run_configurations` | List all available run configurations |
 | `execute_run_configuration` | Execute a run configuration in run or debug mode |
+| `get_run_log` | Get console output from a run session |
 
 ### Debug Session Tools (4)
 
@@ -76,6 +76,7 @@ Tools are organized into categories based on functionality:
 - [Run Configuration Tools](#run-configuration-tools)
   - [list_run_configurations](#list_run_configurations)
   - [execute_run_configuration](#execute_run_configuration)
+  - [get_run_log](#get_run_log)
 - [Debug Session Tools](#debug-session-tools)
   - [list_debug_sessions](#list_debug_sessions)
   - [start_debug_session](#start_debug_session)
@@ -178,6 +179,10 @@ Lists all run configurations available in the project.
 }
 ```
 
+**Session State Values:**
+- `running` - Process is actively executing
+- `stopped` - Process has terminated
+
 ---
 
 ### execute_run_configuration
@@ -222,6 +227,61 @@ Executes a run configuration in either 'run' or 'debug' mode.
   "message": "Started 'UserServiceTest' in debug mode"
 }
 ```
+---
+
+### get_run_log
+
+Retrieves the console output from a run session by its session ID. Returns the last N lines of the log.
+
+**Use when:**
+- Viewing console output from a running application
+- Checking test results and output
+- Debugging application output without breaking into the debugger
+- Monitoring long-running processes
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `session_id` | string | Yes | Session ID from `list_run_sessions` |
+| `lines` | integer | No | Number of lines from the end to return (default: 100, max: 10000) |
+| `project_path` | string | No | Project path |
+
+**Example Request:**
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "get_run_log",
+    "arguments": {
+      "session_id": "run_session_12345",
+      "lines": 50
+    }
+  }
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "sessionId": "12345",
+  "log": "2024-01-15 10:30:15.123 [main] INFO  Application - Starting application...\n2024-01-15 10:30:15.456 [main] INFO  Application - Configuration loaded\n2024-01-15 10:30:16.789 [main] INFO  Application - Server started on port 8080\n",
+  "totalLines": 150,
+  "returnedLines": 50
+}
+```
+
+**Error Response (session not found):**
+
+```json
+{
+  "error": "Run session not found: run_session_12345"
+}
+```
+
+**Note:** The `log` field contains plain text with newline characters (`\n`). Parse this appropriately in your client. If the log is empty, the session may not have produced any output yet, or may have already terminated.
 
 ---
 

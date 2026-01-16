@@ -16,10 +16,11 @@ class ToolModelsTest {
     // Session Models Tests
 
     @Test
-    fun `DebugSessionInfo serialization`() {
-        val info = DebugSessionInfo(
+    fun `SessionInfo serialization`() {
+        val info = SessionInfo(
             id = "sess-123",
             name = "Test Session",
+            type = "debug",
             state = "running",
             isCurrent = true,
             runConfigurationName = "Main"
@@ -29,6 +30,7 @@ class ToolModelsTest {
 
         assertTrue(encoded.contains("\"id\":\"sess-123\""))
         assertTrue(encoded.contains("\"name\":\"Test Session\""))
+        assertTrue(encoded.contains("\"type\":\"debug\""))
         assertTrue(encoded.contains("\"isCurrent\":true"))
     }
 

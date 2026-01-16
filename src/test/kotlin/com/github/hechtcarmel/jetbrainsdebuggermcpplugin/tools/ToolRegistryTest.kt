@@ -154,17 +154,17 @@ class ToolRegistryTest {
     }
 
     @Test
-    fun `registerBuiltInTools registers exactly 22 tools`() {
+    fun `registerBuiltInTools registers exactly 23 tools`() {
         registry.registerBuiltInTools()
 
-        assertEquals(22, registry.getToolCount())
+        assertEquals(23, registry.getToolCount())
     }
 
     @Test
     fun `registerBuiltInTools registers all tool categories`() {
         registry.registerBuiltInTools()
 
-        // Run Configuration Tools (2)
+        // Run Configuration Tools (3)
         assertNotNull(registry.getTool("list_run_configurations"))
         assertNotNull(registry.getTool("execute_run_configuration"))
 

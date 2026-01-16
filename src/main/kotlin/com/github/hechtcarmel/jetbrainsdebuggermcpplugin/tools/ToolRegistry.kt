@@ -12,6 +12,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepInt
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepOutTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepOverTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.navigation.GetSourceContextTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.GetRunLogTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.ListRunConfigurationsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.RunConfigurationTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.GetDebugSessionStatusTool
@@ -56,6 +57,7 @@ class ToolRegistry {
         // Run Configuration Tools
         register(ListRunConfigurationsTool())
         register(RunConfigurationTool())
+        register(GetRunLogTool())
 
         // Debug Session Tools
         register(ListDebugSessionsTool())
