@@ -4,6 +4,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnot
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetBreakpointResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.LogMessageTransformer
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
@@ -159,8 +160,9 @@ class SetBreakpointTool : AbstractMcpTool() {
                         breakpoint.conditionExpression = XExpressionImpl.fromText(it)
                     }
 
-                    logMessage?.let {
-                        breakpoint.logExpressionObject = XExpressionImpl.fromText(it)
+                    logMessage?.let { msg ->
+                        val transformedExpression = LogMessageTransformer.transform(msg, virtualFile)
+                        breakpoint.logExpressionObject = XExpressionImpl.fromText(transformedExpression)
                     }
 
                     suspendPolicy?.let { policy ->

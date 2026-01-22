@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-01-22
+
+### Fixed
+- **Log message expressions now work** - Fixed issue where `log_message` with `{expression}` syntax didn't evaluate variables. The plugin now automatically transforms user-friendly `{expr}` placeholders to language-specific expressions.
+
 ## [3.1.0] - 2026-01-07
 
 ### Added
