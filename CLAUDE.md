@@ -92,6 +92,17 @@ Use log breakpoints (tracepoints) to trace execution without stopping:
 }
 ```
 
+**Log Message Syntax**: Use `{expression}` placeholders in your log message. They are automatically transformed to language-specific expressions:
+
+| Language | Input | Transformed To |
+|----------|-------|----------------|
+| Java | `"x={x}, y={y}"` | `"x=" + (x) + ", y=" + (y)` |
+| Kotlin | `"x={x}, y={y}"` | `"x=$x, y=$y"` |
+| Python | `"x={x}, y={y}"` | `f"x={x}, y={y}"` |
+| JavaScript/TS | `"x={x}, y={y}"` | `` `x=${x}, y=${y}` `` |
+
+You can also pass raw language-specific expressions directly (e.g., `"\"x=\" + x"` for Java) - they pass through unchanged if no `{...}` placeholders are detected.
+
 ### Evaluate Before Modifying
 Before using `set_variable`, use `evaluate_expression` to preview the change:
 ```json
