@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-01-30
+
+### Changed
+- **2026.1 compatibility** - Replaced internal `XExpressionImpl.fromText()` API with public `XDebuggerUtil.createExpression()` for forward compatibility with the JetBrains 2026.1 debugger architecture redesign
+- Added 2026.1 to plugin verification targets
+
 ## [3.1.1] - 2026-01-22
 
 ### Fixed
