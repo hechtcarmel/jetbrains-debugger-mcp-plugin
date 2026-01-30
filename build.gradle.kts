@@ -137,7 +137,6 @@ intellijPlatform {
     pluginVerification {
         ides {
             recommended()
-            create("IC", "2026.1")
         }
     }
 }
