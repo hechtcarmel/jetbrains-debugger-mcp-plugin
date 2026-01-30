@@ -8,9 +8,10 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.Evaluation
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.StackFrameUtils
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.VariablePresentationUtils
 import com.intellij.openapi.project.Project
+import com.intellij.xdebugger.XDebuggerUtil
+import com.intellij.xdebugger.evaluation.EvaluationMode
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.frame.XValue
-import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
@@ -104,7 +105,7 @@ class EvaluateTool : AbstractMcpTool() {
     ): EvaluationResult? {
         return withTimeoutOrNull(10000L) {
             suspendCancellableCoroutine { continuation ->
-                val xExpression = XExpressionImpl.fromText(expression)
+                val xExpression = XDebuggerUtil.getInstance().createExpression(expression, null, null, EvaluationMode.EXPRESSION)
 
                 evaluator.evaluate(
                     xExpression,

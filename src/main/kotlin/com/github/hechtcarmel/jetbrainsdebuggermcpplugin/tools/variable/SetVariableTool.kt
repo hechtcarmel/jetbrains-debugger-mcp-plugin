@@ -7,13 +7,14 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetVariabl
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.VariablePresentationUtils
 import com.intellij.openapi.project.Project
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.xdebugger.XDebuggerUtil
+import com.intellij.xdebugger.evaluation.EvaluationMode
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.frame.XCompositeNode
 import com.intellij.xdebugger.frame.XDebuggerTreeNodeHyperlink
 import com.intellij.xdebugger.frame.XStackFrame
 import com.intellij.xdebugger.frame.XValue
 import com.intellij.xdebugger.frame.XValueChildrenList
-import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
@@ -180,7 +181,7 @@ class SetVariableTool : AbstractMcpTool() {
     ): SetResult {
         return withTimeoutOrNull(5000L) {
             suspendCancellableCoroutine { continuation ->
-                val xExpression = XExpressionImpl.fromText(assignmentExpression)
+                val xExpression = XDebuggerUtil.getInstance().createExpression(assignmentExpression, null, null, EvaluationMode.EXPRESSION)
 
                 evaluator.evaluate(
                     xExpression,

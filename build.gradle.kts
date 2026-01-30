@@ -137,10 +137,7 @@ intellijPlatform {
     pluginVerification {
         ides {
             recommended()
-//            // Additional IDEs for multi-language support verification
-//            create("PC", "2025.1.2") // PyCharm Community
-//            create("PY", "2025.1.2") // PyCharm Professional
-//            create("WS", "2025.1.2") // WebStorm
+            create("IC", "2026.1")
         }
     }
 }
