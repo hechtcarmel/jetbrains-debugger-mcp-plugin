@@ -14,8 +14,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointProperties
 import com.intellij.xdebugger.breakpoints.XBreakpointType
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
-import com.intellij.xdebugger.impl.XDebuggerUtilImpl
-import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl
+import com.intellij.xdebugger.evaluation.EvaluationMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
@@ -157,12 +156,12 @@ class SetBreakpointTool : AbstractMcpTool() {
                     breakpoint.isEnabled = enabled
 
                     condition?.let {
-                        breakpoint.conditionExpression = XExpressionImpl.fromText(it)
+                        breakpoint.conditionExpression = XDebuggerUtil.getInstance().createExpression(it, null, null, EvaluationMode.EXPRESSION)
                     }
 
                     logMessage?.let { msg ->
                         val transformedExpression = LogMessageTransformer.transform(msg, virtualFile)
-                        breakpoint.logExpressionObject = XExpressionImpl.fromText(transformedExpression)
+                        breakpoint.logExpressionObject = XDebuggerUtil.getInstance().createExpression(transformedExpression, null, null, EvaluationMode.EXPRESSION)
                     }
 
                     suspendPolicy?.let { policy ->
