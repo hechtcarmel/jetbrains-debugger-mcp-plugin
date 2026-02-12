@@ -23,6 +23,7 @@ class McpSettings : PersistentStateComponent<McpSettings.State> {
     data class State(
         var maxHistorySize: Int = 1000,
         var serverPort: Int = -1, // -1 means use IDE-specific default
+        var serverHost: String = "", // empty means use DEFAULT_SERVER_HOST
         var migratedToVersion: Int = 0 // Track migration status (2 = v2.0.0 migration done)
     )
 
@@ -41,6 +42,10 @@ class McpSettings : PersistentStateComponent<McpSettings.State> {
     var serverPort: Int
         get() = if (myState.serverPort == -1) McpConstants.getDefaultServerPort() else myState.serverPort
         set(value) { myState.serverPort = value }
+
+    var serverHost: String
+        get() = myState.serverHost.ifEmpty { McpConstants.DEFAULT_SERVER_HOST }
+        set(value) { myState.serverHost = value }
 
     /**
      * Checks if migration to v2.0.0 is needed (user upgrading from v1.x).

@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-02-12
+
+### Added
+- **Configurable server bind address** - New "Server host" setting in Settings > Tools > Debugger MCP Server
+  - Editable combo box with `127.0.0.1` (localhost only, default) and `0.0.0.0` (all interfaces) presets
+  - Enables remote debugging in containers, remote dev environments, and multi-machine setups
+
 ## [3.2.0] - 2026-01-30
 
 ### Changed

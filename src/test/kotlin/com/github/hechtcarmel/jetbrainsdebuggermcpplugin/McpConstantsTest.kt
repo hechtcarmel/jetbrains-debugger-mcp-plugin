@@ -60,7 +60,7 @@ class McpConstantsTest {
     fun `server version follows semver pattern`() {
         val semverRegex = Regex("""\d+\.\d+\.\d+(-[\w.]+)?""")
         assertTrue(semverRegex.matches(McpConstants.SERVER_VERSION))
-        assertEquals("3.0.1", McpConstants.SERVER_VERSION)
+        assertEquals("3.3.0", McpConstants.SERVER_VERSION)
     }
 
     @Test
