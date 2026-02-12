@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-02-12
+
+### Fixed
+- **EDT thread safety** - Fixed `select_stack_frame` and `stop_debug_session` tools crashing with `RuntimeExceptionWithAttachments` when called from a background thread. Both now correctly dispatch to the Event Dispatch Thread.
+
 ## [3.3.0] - 2026-02-12
 
 ### Added

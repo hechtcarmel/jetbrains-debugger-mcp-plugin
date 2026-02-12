@@ -51,7 +51,7 @@ class StopDebugSessionTool : AbstractMcpTool() {
         val sessionName = session.sessionName
 
         return try {
-            session.stop()
+            onEdt { session.stop() }
             createJsonResult(StopSessionResult(
                 sessionId = resolvedSessionId,
                 status = "stopped",

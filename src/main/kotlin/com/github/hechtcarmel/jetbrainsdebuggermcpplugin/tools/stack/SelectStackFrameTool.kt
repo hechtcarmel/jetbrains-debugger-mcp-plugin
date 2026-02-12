@@ -74,7 +74,7 @@ class SelectStackFrameTool : AbstractMcpTool() {
         }
 
         val targetFrame = frames[frameIndex]
-        session.setCurrentStackFrame(executionStack, targetFrame)
+        onEdt { session.setCurrentStackFrame(executionStack, targetFrame) }
 
         val frameInfo = createFrameInfo(targetFrame, frameIndex)
 
