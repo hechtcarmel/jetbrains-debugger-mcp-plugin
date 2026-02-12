@@ -28,8 +28,8 @@ object ClientConfigGenerator {
     private fun getServerUrlOrDefault(): String {
         return McpServerService.getInstance().getServerUrl()
             ?: run {
-                val port = McpSettings.getInstance().serverPort
-                "http://${McpConstants.DEFAULT_SERVER_HOST}:$port${McpConstants.SSE_ENDPOINT_PATH}"
+                val settings = McpSettings.getInstance()
+                "http://${settings.serverHost}:${settings.serverPort}${McpConstants.SSE_ENDPOINT_PATH}"
             }
     }
 

@@ -69,9 +69,9 @@ class McpServerService : Disposable {
         // Register built-in tools
         toolRegistry.registerBuiltInTools()
 
-        // Start the Ktor server with configured port
-        val port = McpSettings.getInstance().serverPort
-        startServer(port)
+        // Start the Ktor server with configured port and host
+        val settings = McpSettings.getInstance()
+        startServer(settings.serverPort, settings.serverHost)
 
         LOG.info("MCP Server Service initialized with Ktor CIO server")
     }
@@ -82,15 +82,15 @@ class McpServerService : Disposable {
      * @param port The port to listen on
      * @return The result of the start operation
      */
-    fun startServer(port: Int): KtorMcpServer.StartResult {
+    fun startServer(port: Int, host: String = McpSettings.getInstance().serverHost): KtorMcpServer.StartResult {
         // Stop existing server if running
         stopServer()
 
-        LOG.info("Starting MCP Server on port $port")
+        LOG.info("Starting MCP Server on $host:$port")
 
         val server = KtorMcpServer(
             port = port,
-            host = McpConstants.DEFAULT_SERVER_HOST,
+            host = host,
             jsonRpcHandler = jsonRpcHandler,
             sseSessionManager = sseSessionManager,
             coroutineScope = coroutineScope
@@ -146,9 +146,9 @@ class McpServerService : Disposable {
      * @param newPort The new port to listen on
      * @return The result of the restart operation
      */
-    fun restartServer(newPort: Int): KtorMcpServer.StartResult {
-        LOG.info("Restarting MCP Server on port $newPort")
-        return startServer(newPort)
+    fun restartServer(newPort: Int, newHost: String = McpSettings.getInstance().serverHost): KtorMcpServer.StartResult {
+        LOG.info("Restarting MCP Server on $newHost:$newPort")
+        return startServer(newPort, newHost)
     }
 
     /**
@@ -175,8 +175,8 @@ class McpServerService : Disposable {
      */
     fun getServerUrl(): String? {
         if (ktorServer == null || serverError != null) return null
-        val port = McpSettings.getInstance().serverPort
-        return "http://${McpConstants.DEFAULT_SERVER_HOST}:$port${McpConstants.SSE_ENDPOINT_PATH}"
+        val settings = McpSettings.getInstance()
+        return "http://${settings.serverHost}:${settings.serverPort}${McpConstants.SSE_ENDPOINT_PATH}"
     }
 
     /**
