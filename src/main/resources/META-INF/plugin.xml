@@ -8,6 +8,8 @@
 <a href="https://modelcontextprotocol.io">Model Context Protocol (MCP)</a>.
 Set breakpoints, step through code, inspect variables, and evaluate expressions—all driven by your AI coding assistant.</p>
 
+<p>If this plugin saves you time, consider <a href="https://buymeacoffee.com/hechtcarmel">buying me a coffee</a>! ☕</p>
+
 <h3>Debug Session Management</h3>
 <ul>
     <li><b>Start/Stop Debug Sessions</b> - Launch any run configuration in debug mode</li>
@@ -54,7 +56,7 @@ Set breakpoints, step through code, inspect variables, and evaluate expressions�
 <ul>
     <li><b>AI-Driven Debugging</b> - Let your AI assistant debug code autonomously</li>
     <li><b>Rich Context</b> - Single-call status provides variables, stack, and source context</li>
-    <li><b>Multi-IDE Support</b> - Works with any JetBrains IDE that has XDebugger</li>
+    <li><b>Multi-IDE Support</b> - Fully tested on IntelliJ IDEA, PyCharm, WebStorm, GoLand, RustRover, Android Studio, PhpStorm</li>
     <li><b>Safe by Default</b> - Destructive operations require confirmation</li>
     <li><b>Zero Configuration</b> - Extends the built-in MCP server infrastructure</li>
 </ul>

@@ -6,7 +6,10 @@
 
 A JetBrains IDE plugin that exposes an **MCP (Model Context Protocol) server**, giving AI coding assistants full programmatic control over the debugger. Set breakpoints, step through code, inspect variables, and evaluate expressions—all driven autonomously by your AI assistant.
 
-**Works with all JetBrains IDEs**: IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, and Android Studio.
+**Fully tested**: IntelliJ IDEA, PyCharm, WebStorm, GoLand, RustRover, Android Studio, PhpStorm
+**May work** (untested): RubyMine, CLion, DataGrip
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/hechtcarmel)
 
 <!-- Plugin description -->
 **Debugger MCP Server** gives AI coding assistants complete control over the IDE's debugger through the Model Context Protocol (MCP). Let your AI assistant debug code autonomously—from setting breakpoints to inspecting variables to stepping through execution.
@@ -346,20 +349,8 @@ Configure the plugin at <kbd>Settings</kbd> > <kbd>Tools</kbd> > <kbd>Debugger M
 
 ### Supported IDEs
 
-All JetBrains IDEs with XDebugger support:
-
-| IDE | Supported |
-|-----|-----------|
-| IntelliJ IDEA Community/Ultimate | Yes |
-| Android Studio | Yes |
-| PyCharm Community/Professional | Yes |
-| WebStorm | Yes |
-| GoLand | Yes |
-| PhpStorm | Yes |
-| RubyMine | Yes |
-| CLion | Yes |
-| Rider | Yes |
-| DataGrip | No (no debugger) |
+**Fully tested**: IntelliJ IDEA, PyCharm, WebStorm, GoLand, RustRover, Android Studio, PhpStorm
+**May work** (untested): RubyMine, CLion, DataGrip
 
 ## Architecture
 
