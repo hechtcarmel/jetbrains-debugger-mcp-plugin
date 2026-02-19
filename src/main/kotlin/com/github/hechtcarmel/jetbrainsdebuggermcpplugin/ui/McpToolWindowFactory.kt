@@ -9,6 +9,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.RefreshAction
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.icons.McpIcons
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable
 import com.intellij.icons.AllIcons
+import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -29,6 +30,7 @@ import java.awt.FlowLayout
 import java.awt.Font
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import javax.swing.Icon
 import javax.swing.JButton
 import javax.swing.JPanel
 
@@ -80,9 +82,28 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
             }
         }
 
-        // Right panel with the button
+        // Right panel with external links + install button
         val rightPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.RIGHT, 4, 0)).apply {
             border = JBUI.Borders.empty(2, 4)
+            add(createExternalLink(
+                AllIcons.Vcs.Vendors.Github,
+                "Star/Report Issues",
+                "Star the project or report issues on GitHub",
+                "https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin"
+            ))
+            add(createExternalLink(
+                McpIcons.IndexMcp,
+                "Try IDE Index MCP Server",
+                "Install the companion IDE Index MCP Server plugin",
+                "https://plugins.jetbrains.com/plugin/29174-ide-index-mcp-server"
+            ))
+            add(createExternalLink(
+                McpIcons.BuyMeACoffee,
+                "Buy Me a Coffee",
+                "Support the developer on Buy Me a Coffee",
+                "https://buymeacoffee.com/hechtcarmel"
+            ))
+            add(createToolbarSeparator())
             add(installButton)
         }
 
@@ -130,8 +151,9 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
                 toolTipText = "Open MCP Server settings"
             }
 
-            // Label text
-            val settingsLabel = JBLabel("Change port").apply {
+            // Label text - always use HTML to prevent layout shift on hover
+            val settingsText = "Change port"
+            val settingsLabel = JBLabel("<html>$settingsText</html>").apply {
                 font = font.deriveFont(Font.PLAIN, 11f)
                 foreground = JBColor.BLUE
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
@@ -144,10 +166,10 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
                     ShowSettingsUtil.getInstance().showSettingsDialog(project, McpSettingsConfigurable::class.java)
                 }
                 override fun mouseEntered(e: MouseEvent) {
-                    settingsLabel.text = "<html><u>Change port</u></html>"
+                    settingsLabel.text = "<html><u>$settingsText</u></html>"
                 }
                 override fun mouseExited(e: MouseEvent) {
-                    settingsLabel.text = "Change port"
+                    settingsLabel.text = "<html>$settingsText</html>"
                 }
             }
 
@@ -156,6 +178,49 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
 
             add(settingsIcon)
             add(settingsLabel)
+        }
+    }
+
+    private fun createToolbarSeparator(): JPanel {
+        return JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            border = JBUI.Borders.empty(2, 4)
+            add(JBLabel("|").apply {
+                foreground = JBColor.GRAY
+            })
+        }
+    }
+
+    private fun createExternalLink(icon: Icon, text: String, tooltip: String, url: String): JPanel {
+        return JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 4, 0)).apply {
+            val linkIcon = JBLabel(icon).apply {
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                toolTipText = tooltip
+            }
+
+            val linkLabel = JBLabel("<html>$text</html>").apply {
+                font = font.deriveFont(Font.PLAIN, 11f)
+                foreground = JBColor.BLUE
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                toolTipText = tooltip
+            }
+
+            val clickHandler = object : MouseAdapter() {
+                override fun mouseClicked(e: MouseEvent) {
+                    BrowserUtil.browse(url)
+                }
+                override fun mouseEntered(e: MouseEvent) {
+                    linkLabel.text = "<html><u>$text</u></html>"
+                }
+                override fun mouseExited(e: MouseEvent) {
+                    linkLabel.text = "<html>$text</html>"
+                }
+            }
+
+            linkIcon.addMouseListener(clickHandler)
+            linkLabel.addMouseListener(clickHandler)
+
+            add(linkIcon)
+            add(linkLabel)
         }
     }
 }

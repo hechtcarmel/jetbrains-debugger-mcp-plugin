@@ -8,6 +8,8 @@ A JetBrains IDE plugin that exposes an **MCP (Model Context Protocol) server**, 
 
 **Works with all JetBrains IDEs**: IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, and Android Studio.
 
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/hechtcarmel)
+
 <!-- Plugin description -->
 **Debugger MCP Server** gives AI coding assistants complete control over the IDE's debugger through the Model Context Protocol (MCP). Let your AI assistant debug code autonomously—from setting breakpoints to inspecting variables to stepping through execution.
 
