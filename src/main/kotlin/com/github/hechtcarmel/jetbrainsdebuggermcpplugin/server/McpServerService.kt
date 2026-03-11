@@ -38,6 +38,7 @@ class McpServerService : Disposable {
     private val toolRegistry: ToolRegistry = ToolRegistry()
     private val jsonRpcHandler: JsonRpcHandler
     private val sseSessionManager: KtorSseSessionManager = KtorSseSessionManager()
+    private val streamableHttpSessionManager: StreamableHttpSessionManager = StreamableHttpSessionManager()
     private var ktorServer: KtorMcpServer? = null
     private var serverError: ServerError? = null
 
@@ -93,6 +94,7 @@ class McpServerService : Disposable {
             host = host,
             jsonRpcHandler = jsonRpcHandler,
             sseSessionManager = sseSessionManager,
+            streamableHttpSessionManager = streamableHttpSessionManager,
             coroutineScope = coroutineScope
         )
 
@@ -125,11 +127,11 @@ class McpServerService : Disposable {
      * Notifies all listeners that the server status has changed.
      */
     private fun notifyStatusChanged() {
-        ApplicationManager.getApplication().invokeLater {
+        ApplicationManager.getApplication().invokeLater({
             ApplicationManager.getApplication().messageBus
                 .syncPublisher(McpConstants.SERVER_STATUS_TOPIC)
                 .serverStatusChanged()
-        }
+        }, com.intellij.openapi.application.ModalityState.any())
     }
 
     /**
@@ -173,7 +175,24 @@ class McpServerService : Disposable {
      *
      * @return The server URL, or null if server is not running
      */
+    /**
+     * Returns the Streamable HTTP endpoint URL for MCP connections (primary transport).
+     * Clients should use this URL for the MCP 2025-03-26 Streamable HTTP transport.
+     *
+     * @return The server URL, or null if server is not running
+     */
     fun getServerUrl(): String? {
+        if (ktorServer == null || serverError != null) return null
+        val settings = McpSettings.getInstance()
+        return "http://${settings.serverHost}:${settings.serverPort}${McpConstants.STREAMABLE_HTTP_ENDPOINT_PATH}"
+    }
+
+    /**
+     * Returns the legacy SSE endpoint URL for older MCP clients (2024-11-05 transport).
+     *
+     * @return The SSE URL, or null if server is not running
+     */
+    fun getLegacySseUrl(): String? {
         if (ktorServer == null || serverError != null) return null
         val settings = McpSettings.getInstance()
         return "http://${settings.serverHost}:${settings.serverPort}${McpConstants.SSE_ENDPOINT_PATH}"
@@ -211,6 +230,7 @@ class McpServerService : Disposable {
         LOG.info("Disposing MCP Server Service")
         stopServer()
         sseSessionManager.closeAllSessions()
+        streamableHttpSessionManager.closeAllSessions()
         coroutineScope.cancel("McpServerService disposed")
     }
 }
@@ -222,7 +242,8 @@ data class ServerStatusInfo(
     val name: String,
     val version: String,
     val protocolVersion: String,
-    val sseUrl: String,
+    val streamableHttpUrl: String,
+    val legacySseUrl: String,
     val postUrl: String,
     val port: Int,
     val registeredTools: Int,

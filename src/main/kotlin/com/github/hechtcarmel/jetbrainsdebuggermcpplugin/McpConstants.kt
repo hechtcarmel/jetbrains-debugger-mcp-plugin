@@ -25,16 +25,20 @@ object McpConstants {
      */
     const val DEFAULT_SERVER_PORT = 29190
 
-    // MCP Endpoint paths (HTTP+SSE transport)
+    // MCP Endpoint paths
     const val MCP_ENDPOINT_PATH = "/debugger-mcp"
     const val SSE_ENDPOINT_PATH = "$MCP_ENDPOINT_PATH/sse"
+    const val STREAMABLE_HTTP_ENDPOINT_PATH = "$MCP_ENDPOINT_PATH/streamable-http"
     const val SESSION_ID_PARAM = "sessionId"
+    const val MCP_SESSION_ID_HEADER = "Mcp-Session-Id"
 
     // JSON-RPC version
     const val JSON_RPC_VERSION = "2.0"
 
-    // MCP Protocol version
-    const val MCP_PROTOCOL_VERSION = "2024-11-05"
+    // MCP Protocol versions
+    const val LEGACY_MCP_PROTOCOL_VERSION = "2024-11-05"
+    const val STREAMABLE_HTTP_MCP_PROTOCOL_VERSION = "2025-03-26"
+    const val MCP_PROTOCOL_VERSION = STREAMABLE_HTTP_MCP_PROTOCOL_VERSION
 
     // Server identification - IDE-specific
     /**
@@ -43,7 +47,7 @@ object McpConstants {
     @JvmStatic
     fun getServerName(): String = IdeProductInfo.getServerName()
 
-    const val SERVER_VERSION = "3.3.1"
+    const val SERVER_VERSION = "4.0.0"
     const val SERVER_DESCRIPTION = """Debug applications running in JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.) through programmatic control.
 
 When to use: Use this server when you need to:

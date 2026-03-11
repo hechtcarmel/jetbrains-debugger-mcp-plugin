@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-03-11
+
+### Added
+- **Streamable HTTP transport** - New primary MCP transport (2025-03-26 spec) at `/debugger-mcp/streamable-http`
+
+### Changed
+- **Default transport is now Streamable HTTP** - All client install/copy commands updated:
+  - Claude Code: `--transport http` (was `--transport sse`)
+  - Codex CLI: `--url` with native Streamable HTTP (was `mcp-remote` bridge)
+  - Gemini CLI: `httpUrl` field for native Streamable HTTP (was `mcp-remote` command)
+- **Protocol version** - Default MCP protocol version is now `2025-03-26` (was `2024-11-05`)
+- **Generic config options** - "Standard SSE" / "Via mcp-remote" renamed to "Streamable HTTP" / "Legacy SSE"
+
+### Removed
+- `ktor-server-cors` dependency (replaced by manual CORS handling)
+
 ## [3.4.0] - 2026-02-19
 
 ### Added
