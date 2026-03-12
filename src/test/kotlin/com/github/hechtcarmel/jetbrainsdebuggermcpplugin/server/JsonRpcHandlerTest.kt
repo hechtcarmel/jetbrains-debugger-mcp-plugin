@@ -211,6 +211,23 @@ class JsonRpcHandlerTest : BasePlatformTestCase() {
         assertEquals("test-id-123", jsonResponse["id"]?.jsonPrimitive?.content)
     }
 
+    fun `test initialize request can override protocol version`() = runBlocking {
+        val request = """
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {}
+            }
+        """.trimIndent()
+
+        val response = handler.handleRequest(request, "2024-11-05")
+        val jsonResponse = Json.parseToJsonElement(response!!).jsonObject
+        val result = jsonResponse["result"]?.jsonObject
+
+        assertEquals("2024-11-05", result?.get("protocolVersion")?.jsonPrimitive?.content)
+    }
+
     fun `test initialize returns capabilities with tools`() = runBlocking {
         val request = """
             {

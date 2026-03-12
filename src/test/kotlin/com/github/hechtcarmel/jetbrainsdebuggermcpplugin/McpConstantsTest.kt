@@ -44,7 +44,7 @@ class McpConstantsTest {
 
     @Test
     fun `MCP protocol version is valid date format`() {
-        assertEquals("2024-11-05", McpConstants.MCP_PROTOCOL_VERSION)
+        assertEquals("2025-03-26", McpConstants.MCP_PROTOCOL_VERSION)
         val regex = Regex("""\d{4}-\d{2}-\d{2}""")
         assertTrue(regex.matches(McpConstants.MCP_PROTOCOL_VERSION))
     }
@@ -60,7 +60,7 @@ class McpConstantsTest {
     fun `server version follows semver pattern`() {
         val semverRegex = Regex("""\d+\.\d+\.\d+(-[\w.]+)?""")
         assertTrue(semverRegex.matches(McpConstants.SERVER_VERSION))
-        assertEquals("3.3.1", McpConstants.SERVER_VERSION)
+        assertEquals("4.0.0", McpConstants.SERVER_VERSION)
     }
 
     @Test

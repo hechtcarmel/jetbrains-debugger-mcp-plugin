@@ -38,41 +38,35 @@ class ClientConfigGeneratorTest {
 
     @Test
     fun `buildClaudeCodeCommand generates correct command format`() {
-        val serverUrl = "http://127.0.0.1:63342/debugger-mcp/sse"
+        val serverUrl = "http://127.0.0.1:63342/debugger-mcp/streamable-http"
         val serverName = "intellij-debugger"
 
         val command = ClientConfigGenerator.buildClaudeCodeCommand(serverUrl, serverName)
 
         val expectedCommand = "claude mcp remove jetbrains-debugger 2>/dev/null ; " +
             "claude mcp remove intellij-debugger 2>/dev/null ; " +
-            "claude mcp add --transport sse intellij-debugger http://127.0.0.1:63342/debugger-mcp/sse --scope user"
+            "claude mcp add --transport http intellij-debugger http://127.0.0.1:63342/debugger-mcp/streamable-http --scope user"
 
-        assertEquals(
-            expectedCommand,
-            command
-        )
+        assertEquals(expectedCommand, command)
     }
 
     @Test
     fun `buildClaudeCodeCommand removes legacy server name`() {
         val command = ClientConfigGenerator.buildClaudeCodeCommand(
-            "http://127.0.0.1:29190/debugger-mcp/sse",
+            "http://127.0.0.1:29190/debugger-mcp/streamable-http",
             "pycharm-debugger"
         )
 
-        assertTrue(
-            command.contains("claude mcp remove jetbrains-debugger")
-        )
+        assertTrue(command.contains("claude mcp remove jetbrains-debugger"))
     }
 
     @Test
     fun `buildClaudeCodeCommand includes 2 devnull redirect for remove commands`() {
         val command = ClientConfigGenerator.buildClaudeCodeCommand(
-            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "http://127.0.0.1:63342/debugger-mcp/streamable-http",
             "webstorm-debugger"
         )
 
-        // Both remove commands should have 2>/dev/null
         val removeCount = command.split("2>/dev/null").size - 1
         assertEquals(2, removeCount)
     }
@@ -80,7 +74,7 @@ class ClientConfigGeneratorTest {
     @Test
     fun `buildClaudeCodeCommand separates commands with semicolon`() {
         val command = ClientConfigGenerator.buildClaudeCodeCommand(
-            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "http://127.0.0.1:63342/debugger-mcp/streamable-http",
             "goland-debugger"
         )
 
@@ -92,40 +86,35 @@ class ClientConfigGeneratorTest {
     @Test
     fun `buildClaudeCodeCommand remove comes before add`() {
         val command = ClientConfigGenerator.buildClaudeCodeCommand(
-            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "http://127.0.0.1:63342/debugger-mcp/streamable-http",
             "clion-debugger"
         )
 
         val lastRemoveIndex = command.lastIndexOf("remove")
         val addIndex = command.indexOf("add")
 
-        assertTrue(
-            lastRemoveIndex < addIndex
-        )
+        assertTrue(lastRemoveIndex < addIndex)
     }
 
     // buildCodexCommand Tests
 
     @Test
     fun `buildCodexCommand generates correct command format`() {
-        val serverUrl = "http://127.0.0.1:63342/debugger-mcp/sse"
+        val serverUrl = "http://127.0.0.1:63342/debugger-mcp/streamable-http"
         val serverName = "intellij-debugger"
 
         val command = ClientConfigGenerator.buildCodexCommand(serverUrl, serverName)
 
         val expectedCommand = "codex mcp remove intellij-debugger >/dev/null 2>&1 ; " +
-            "codex mcp add intellij-debugger -- npx -y mcp-remote http://127.0.0.1:63342/debugger-mcp/sse --allow-http"
+            "codex mcp add intellij-debugger --url http://127.0.0.1:63342/debugger-mcp/streamable-http"
 
-        assertEquals(
-            expectedCommand,
-            command
-        )
+        assertEquals(expectedCommand, command)
     }
 
     @Test
     fun `buildCodexCommand includes 2 devnull redirect for remove command`() {
         val command = ClientConfigGenerator.buildCodexCommand(
-            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "http://127.0.0.1:63342/debugger-mcp/streamable-http",
             "webstorm-debugger"
         )
 
@@ -135,7 +124,7 @@ class ClientConfigGeneratorTest {
     @Test
     fun `buildCodexCommand separates commands with semicolon`() {
         val command = ClientConfigGenerator.buildCodexCommand(
-            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "http://127.0.0.1:63342/debugger-mcp/streamable-http",
             "goland-debugger"
         )
 
@@ -147,16 +136,14 @@ class ClientConfigGeneratorTest {
     @Test
     fun `buildCodexCommand remove comes before add`() {
         val command = ClientConfigGenerator.buildCodexCommand(
-            "http://127.0.0.1:63342/debugger-mcp/sse",
+            "http://127.0.0.1:63342/debugger-mcp/streamable-http",
             "clion-debugger"
         )
 
         val removeIndex = command.indexOf("remove")
         val addIndex = command.indexOf("add")
 
-        assertTrue(
-            removeIndex < addIndex
-        )
+        assertTrue(removeIndex < addIndex)
     }
 
     // getConfigLocationHint Tests
@@ -191,26 +178,26 @@ class ClientConfigGeneratorTest {
 
         assertTrue(hint.contains("settings.json"))
         assertTrue(hint.contains(".gemini") || hint.contains("gemini"))
-        assertTrue(hint.contains("mcp-remote"))
+        assertTrue(hint.contains("httpUrl") || hint.contains("Streamable HTTP"))
     }
 
     // Hint Methods Tests
 
     @Test
-    fun `getStandardSseHint mentions SSE transport`() {
-        val hint = ClientConfigGenerator.getStandardSseHint()
+    fun `getStreamableHttpHint mentions Streamable HTTP`() {
+        val hint = ClientConfigGenerator.getStreamableHttpHint()
 
-        assertTrue(hint.contains("SSE"))
-        assertTrue(hint.contains("transport"))
+        assertTrue(hint.contains("Streamable HTTP"))
+        assertTrue(hint.contains("2025-03-26"))
     }
 
     @Test
-    fun `getMcpRemoteHint mentions mcp-remote and stdio`() {
-        val hint = ClientConfigGenerator.getMcpRemoteHint()
+    fun `getLegacySseHint mentions legacy SSE`() {
+        val hint = ClientConfigGenerator.getLegacySseHint()
 
-        assertTrue(hint.contains("mcp-remote"))
-        assertTrue(hint.contains("stdio"))
-        assertTrue(hint.contains("--allow-http"))
+        assertTrue(hint.contains("Legacy"))
+        assertTrue(hint.contains("SSE"))
+        assertTrue(hint.contains("2024-11-05"))
     }
 
     // getAvailableClients Tests
@@ -270,32 +257,23 @@ class ClientConfigGeneratorTest {
     }
 
     @Test
-    fun `Gemini CLI config format uses mcp-remote`() {
+    fun `Gemini CLI config format uses httpUrl`() {
         val expectedFormat = """
 {
   "mcpServers": {
     "SERVER_NAME": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "SERVER_URL",
-        "--allow-http"
-      ]
+      "httpUrl": "SERVER_URL"
     }
   }
 }
         """.trimIndent()
 
         assertTrue(expectedFormat.contains("mcpServers"))
-        assertTrue(expectedFormat.contains("command"))
-        assertTrue(expectedFormat.contains("npx"))
-        assertTrue(expectedFormat.contains("mcp-remote"))
-        assertTrue(expectedFormat.contains("--allow-http"))
+        assertTrue(expectedFormat.contains("httpUrl"))
     }
 
     @Test
-    fun `Standard SSE config format has url key`() {
+    fun `Streamable HTTP config format has url key`() {
         val expectedFormat = """
 {
   "mcpServers": {
@@ -311,28 +289,18 @@ class ClientConfigGeneratorTest {
     }
 
     @Test
-    fun `mcp-remote config format has command and args`() {
+    fun `Legacy SSE config format has url key`() {
         val expectedFormat = """
 {
   "mcpServers": {
     "SERVER_NAME": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "SERVER_URL",
-        "--allow-http"
-      ]
+      "url": "SERVER_URL"
     }
   }
 }
         """.trimIndent()
 
-        assertTrue(expectedFormat.contains("command"))
-        assertTrue(expectedFormat.contains("args"))
-        assertTrue(expectedFormat.contains("npx"))
-        assertTrue(expectedFormat.contains("mcp-remote"))
-        assertTrue(expectedFormat.contains("-y"))
-        assertTrue(expectedFormat.contains("--allow-http"))
+        assertTrue(expectedFormat.contains("mcpServers"))
+        assertTrue(expectedFormat.contains("url"))
     }
 }

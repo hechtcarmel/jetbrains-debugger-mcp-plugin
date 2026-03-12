@@ -38,7 +38,10 @@ class JsonRpcHandler(
         private const val MSG_MULTIPLE_PROJECTS = "Multiple projects are open. Please specify the 'project_path' parameter."
     }
 
-    suspend fun handleRequest(jsonString: String): String? {
+    suspend fun handleRequest(jsonString: String): String? =
+        handleRequest(jsonString, McpConstants.MCP_PROTOCOL_VERSION)
+
+    suspend fun handleRequest(jsonString: String, protocolVersion: String): String? {
         val request = try {
             json.decodeFromString<JsonRpcRequest>(jsonString)
         } catch (e: Exception) {
@@ -47,7 +50,7 @@ class JsonRpcHandler(
         }
 
         val response = try {
-            routeRequest(request)
+            routeRequest(request, protocolVersion)
         } catch (e: Exception) {
             LOG.error("Error processing request: ${request.method}", e)
             createInternalErrorResponse(request.id, e.message ?: "Unknown error")
@@ -56,9 +59,9 @@ class JsonRpcHandler(
         return response?.let { json.encodeToString(response) }
     }
 
-    private suspend fun routeRequest(request: JsonRpcRequest): JsonRpcResponse? {
+    private suspend fun routeRequest(request: JsonRpcRequest, protocolVersion: String): JsonRpcResponse? {
         return when (request.method) {
-            JsonRpcMethods.INITIALIZE -> processInitialize(request)
+            JsonRpcMethods.INITIALIZE -> processInitialize(request, protocolVersion)
             JsonRpcMethods.NOTIFICATIONS_INITIALIZED -> null
             JsonRpcMethods.TOOLS_LIST -> processToolsList(request)
             JsonRpcMethods.TOOLS_CALL -> processToolCall(request)
@@ -67,9 +70,9 @@ class JsonRpcHandler(
         }
     }
 
-    private fun processInitialize(request: JsonRpcRequest): JsonRpcResponse {
+    private fun processInitialize(request: JsonRpcRequest, protocolVersion: String): JsonRpcResponse {
         val result = InitializeResult(
-            protocolVersion = McpConstants.MCP_PROTOCOL_VERSION,
+            protocolVersion = protocolVersion,
             serverInfo = ServerInfo(
                 name = McpConstants.getServerName(),
                 version = McpConstants.SERVER_VERSION,

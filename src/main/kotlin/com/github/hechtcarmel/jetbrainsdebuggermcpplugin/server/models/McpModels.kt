@@ -25,7 +25,7 @@ data class ToolCapability(
 
 @Serializable
 data class InitializeResult(
-    val protocolVersion: String = "2024-11-05",
+    val protocolVersion: String = "2025-03-26",
     val capabilities: ServerCapabilities = ServerCapabilities(),
     val serverInfo: ServerInfo
 )
