@@ -52,19 +52,26 @@ Set breakpoints, step through code, inspect variables, and evaluate expressionsâ
     <li><b>Thread Listing</b> - See all threads and their states</li>
 </ul>
 
+<h3>Companion Skill</h3>
+<ul>
+    <li><b>AI Debugging Guidance</b> - Bundled companion skill teaches AI agents optimal debugger tool usage</li>
+    <li><b>One-Click Install</b> - Install to your project's .claude/skills/ or export as .skill/.zip</li>
+</ul>
+
 <h3>Why This Plugin?</h3>
 <ul>
     <li><b>AI-Driven Debugging</b> - Let your AI assistant debug code autonomously</li>
     <li><b>Rich Context</b> - Single-call status provides variables, stack, and source context</li>
     <li><b>Multi-IDE Support</b> - Fully tested on IntelliJ IDEA, PyCharm, WebStorm, GoLand, RustRover, Android Studio, PhpStorm</li>
-    <li><b>Safe by Default</b> - Destructive operations require confirmation</li>
-    <li><b>Zero Configuration</b> - Extends the built-in MCP server infrastructure</li>
+    <li><b>Configurable Server</b> - IDE-specific ports with customizable host binding</li>
+    <li><b>Dual Transport</b> - Streamable HTTP (2025-03-26) primary, with legacy SSE fallback</li>
 </ul>
 
 <h3>Supported AI Assistants</h3>
 <ul>
     <li>Claude Code (CLI)</li>
-    <li>Claude Desktop</li>
+    <li>Codex CLI</li>
+    <li>Gemini CLI</li>
     <li>Cursor</li>
     <li>Windsurf</li>
     <li>VS Code with MCP extension</li>
@@ -75,8 +82,8 @@ Set breakpoints, step through code, inspect variables, and evaluate expressionsâ
 <ol>
     <li>Install plugin and restart IDE</li>
     <li>Open <b>Debugger MCP Server</b> tool window (bottom panel)</li>
-    <li>Click <b>"Install on Coding Agents"</b></li>
-    <li>Select your AI assistant and follow the instructions</li>
+    <li>Click <b>"Install on Coding Agents"</b> to configure your AI assistant</li>
+    <li>Optionally click <b>"Get Companion Skill"</b> to install enhanced debugging guidance</li>
     <li>Ask your AI to set breakpoints and start debugging!</li>
 </ol>
 
@@ -126,4 +133,13 @@ for detailed documentation and examples.</p>
         <!-- Notification group for plugin messages -->
         <notificationGroup id="Debugger MCP Server" displayType="BALLOON"/>
     </extensions>
+
+    <actions>
+        <group id="DebuggerMcpServer.Actions" text="Debugger MCP Server">
+            <action id="DebuggerMcpServer.InstallSkill"
+                    class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.InstallSkillAction"
+                    text="Get Companion Skill"
+                    description="Install or export the companion skill for AI coding agents"/>
+        </group>
+    </actions>
 </idea-plugin>
