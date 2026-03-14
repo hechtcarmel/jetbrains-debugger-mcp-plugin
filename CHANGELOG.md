@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-03-14
+
+### Added
+- **Companion skill** - "Get Companion Skill" button in the tool window toolbar that guides AI coding agents on when and how to use the debugger MCP tools effectively
+  - Install directly to project's `.claude/skills/` directory for Claude Code
+  - Export as `.skill` or `.zip` file for sharing or manual installation
+
 ## [4.0.0] - 2026-03-11
 
 ### Added

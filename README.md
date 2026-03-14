@@ -44,6 +44,10 @@ A JetBrains IDE plugin that exposes an **MCP (Model Context Protocol) server**, 
 - **Frame Selection** - Switch context to any stack frame
 - **Thread Listing** - See all threads and their states
 
+**Companion Skill**
+- **AI Debugging Guidance** - Bundled companion skill teaches AI agents optimal debugger tool usage
+- **One-Click Install** - Install to `.claude/skills/` or export as `.skill`/`.zip`
+
 ### Why Use This Plugin?
 
 Unlike manual debugging, this plugin enables:
@@ -52,6 +56,7 @@ Unlike manual debugging, this plugin enables:
 - **Programmatic Breakpoint Control** - Set conditional breakpoints with complex expressions
 - **Cross-IDE Compatibility** - Works with any JetBrains IDE that supports XDebugger
 - **22 Comprehensive Tools** - Full debugging capability through MCP
+- **Configurable Server** - IDE-specific ports with customizable host binding
 
 Perfect for AI-assisted development workflows where you want your assistant to investigate bugs, validate fixes, or explore code behavior autonomously.
 <!-- Plugin description end -->
@@ -87,9 +92,9 @@ Download the [latest release](https://github.com/hechtcarmel/jetbrains-debugger-
 ## Quick Start
 
 1. **Install the plugin** and restart your JetBrains IDE
-2. **Open a project** - the MCP server starts automatically
-3. **Find your IDE port**: <kbd>Settings</kbd> > <kbd>Build, Execution, Deployment</kbd> > <kbd>Debugger</kbd> > <kbd>Built-in Server Port</kbd> (default: 63342)
-4. **Configure your AI assistant** with the server URL: `http://127.0.0.1:{PORT}/debugger-mcp/sse`
+2. **Open a project** - the MCP server starts automatically on an IDE-specific port
+3. **Find your IDE port**: <kbd>Settings</kbd> > <kbd>Tools</kbd> > <kbd>Debugger MCP Server</kbd> (each IDE has a unique default port, e.g., 29190 for IntelliJ IDEA)
+4. **Configure your AI assistant** with the server URL: `http://127.0.0.1:{PORT}/debugger-mcp/streamable-http`
 5. **Use the tool window** (bottom panel: "Debugger MCP Server") to copy configuration or monitor commands
 
 ### Using the "Install on Coding Agents" Button
@@ -97,9 +102,10 @@ Download the [latest release](https://github.com/hechtcarmel/jetbrains-debugger-
 The easiest way to configure your AI assistant:
 1. Open the "Debugger MCP Server" tool window (bottom panel)
 2. Click the prominent **"Install on Coding Agents"** button on the right side of the toolbar
-3. A popup appears with two sections:
+3. A popup appears with three sections:
    - **Install Now** - For Claude Code CLI and Codex CLI: Runs the installation command automatically
-   - **Copy Configuration** - For other clients: Copies the JSON config to your clipboard
+   - **Copy Configuration** - For other clients (Gemini CLI, Cursor, etc.): Copies the JSON config to your clipboard
+   - **Generic MCP Config** - Streamable HTTP or Legacy SSE configuration for any MCP client
 4. For "Copy Configuration" clients, paste the config into the appropriate config file
 
 ## Example Workflow
@@ -116,24 +122,31 @@ Or for more complex debugging:
 
 ### Claude Code (CLI)
 
-The easiest way is to use the **"Install on Coding Agents"** button in the IDE's tool window—it generates the correct command with your IDE-specific server name (e.g., `intellij-debugger`, `pycharm-debugger`).
+The easiest way is to use the **"Install on Coding Agents"** button in the IDE's tool window—it generates the correct command with your IDE-specific server name and port.
 
-Or run this command manually in your terminal (replace `<ide>-debugger` with your IDE name):
+Or run this command manually in your terminal (replace `<ide>-debugger` and port with your IDE's values):
 
 ```bash
-claude mcp add --transport sse intellij-debugger http://127.0.0.1:63342/debugger-mcp/sse --scope user
+claude mcp add --transport http intellij-debugger http://127.0.0.1:29190/debugger-mcp/streamable-http --scope user
 ```
 
-**IDE-specific server names:**
-- IntelliJ IDEA: `intellij-debugger`
-- PyCharm: `pycharm-debugger`
-- WebStorm: `webstorm-debugger`
-- GoLand: `goland-debugger`
-- PhpStorm: `phpstorm-debugger`
-- RubyMine: `rubymine-debugger`
-- CLion: `clion-debugger`
-- RustRover: `rustrover-debugger`
-- Android Studio: `android-studio-debugger`
+**IDE-specific server names and default ports:**
+
+| IDE | Server Name | Default Port |
+|-----|-------------|-------------|
+| IntelliJ IDEA | `intellij-debugger` | 29190 |
+| Android Studio | `android-studio-debugger` | 29191 |
+| PyCharm | `pycharm-debugger` | 29192 |
+| WebStorm | `webstorm-debugger` | 29193 |
+| GoLand | `goland-debugger` | 29194 |
+| PhpStorm | `phpstorm-debugger` | 29195 |
+| RubyMine | `rubymine-debugger` | 29196 |
+| CLion | `clion-debugger` | 29197 |
+| RustRover | `rustrover-debugger` | 29198 |
+| DataGrip | `datagrip-debugger` | 29199 |
+| Aqua | `aqua-debugger` | 29200 |
+| DataSpell | `dataspell-debugger` | 29201 |
+| Rider | `rider-debugger` | 29202 |
 
 Options:
 - `--scope user` - Adds globally for all projects
@@ -143,15 +156,29 @@ To remove: `claude mcp remove intellij-debugger` (use your IDE's name)
 
 ### Codex CLI
 
-The easiest way is to use the **"Install on Coding Agents"** button in the IDE's tool window—it generates the correct command with your IDE-specific server name (e.g., `intellij-debugger`, `pycharm-debugger`).
+The easiest way is to use the **"Install on Coding Agents"** button in the IDE's tool window—it generates the correct command with your IDE-specific server name and port.
 
-Or run this command manually in your terminal (replace `<ide>-debugger` with your IDE name):
+Or run this command manually in your terminal (replace `<ide>-debugger` and port with your IDE's values):
 
 ```bash
-codex mcp add intellij-debugger -- npx -y mcp-remote http://127.0.0.1:63342/debugger-mcp/sse --allow-http
+codex mcp add intellij-debugger --url http://127.0.0.1:29190/debugger-mcp/streamable-http
 ```
 
 To remove: `codex mcp remove intellij-debugger` (use your IDE's name)
+
+### Gemini CLI
+
+Add to `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "intellij-debugger": {
+      "httpUrl": "http://127.0.0.1:29190/debugger-mcp/streamable-http"
+    }
+  }
+}
+```
 
 ### Cursor
 
@@ -161,7 +188,7 @@ Add to `.cursor/mcp.json` in your project root or `~/.cursor/mcp.json` globally:
 {
   "mcpServers": {
     "intellij-debugger": {
-      "url": "http://127.0.0.1:63342/debugger-mcp/sse"
+      "url": "http://127.0.0.1:29190/debugger-mcp/streamable-http"
     }
   }
 }
@@ -175,7 +202,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "intellij-debugger": {
-      "serverUrl": "http://127.0.0.1:63342/debugger-mcp/sse"
+      "serverUrl": "http://127.0.0.1:29190/debugger-mcp/streamable-http"
     }
   }
 }
@@ -187,16 +214,15 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcp.servers": {
     "intellij-debugger": {
-      "transport": "sse",
-      "url": "http://127.0.0.1:63342/debugger-mcp/sse"
+      "url": "http://127.0.0.1:29190/debugger-mcp/streamable-http"
     }
   }
 }
 ```
 
-> **Note**: Replace `intellij-debugger` with your IDE's server name (see list above).
+> **Note**: Replace `intellij-debugger` and the port with your IDE's server name and default port (see table above).
 
-> **Note**: Replace `63342` with your actual IDE port if different. Check <kbd>Settings</kbd> > <kbd>Debugger</kbd> > <kbd>Built-in Server Port</kbd>.
+> **Note**: The port can be changed in <kbd>Settings</kbd> > <kbd>Tools</kbd> > <kbd>Debugger MCP Server</kbd>.
 
 ## Available Tools
 
@@ -290,6 +316,7 @@ If `project_path` is omitted:
 The plugin adds a "Debugger MCP Server" tool window (bottom panel) that shows:
 
 - **Server Status**: Running indicator with server URL and port
+- **Agent Rule Tip**: Copy a rule for your AI agent's config to prefer debugger MCP tools
 - **Project Name**: Currently active project
 - **Command History**: Log of all MCP tool calls with:
   - Timestamp
@@ -297,6 +324,7 @@ The plugin adds a "Debugger MCP Server" tool window (bottom panel) that shows:
   - Status (Success/Error/Pending)
   - Parameters and results (expandable)
   - Execution duration
+- **Filters**: Filter history by tool name, status, or search text
 
 ### Tool Window Actions
 
@@ -305,7 +333,12 @@ The plugin adds a "Debugger MCP Server" tool window (bottom panel) that shows:
 | Refresh | Refresh server status and command history |
 | Copy URL | Copy the MCP server URL to clipboard |
 | Clear History | Clear the command history |
-| Export History | Export history to JSON or CSV file |
+| Export History | Export history to JSON file |
+| Change Port | Open settings to configure server port and host |
+| Star/Report Issues | Link to GitHub repository |
+| Try IDE Index MCP Server | Link to companion plugin |
+| Buy Me a Coffee | Support the developer |
+| **Get Companion Skill** | Install or export the companion AI skill for enhanced debugging guidance |
 | **Install on Coding Agents** | Install MCP server on AI assistants (prominent button on right) |
 
 ## Error Codes
@@ -336,27 +369,34 @@ Configure the plugin at <kbd>Settings</kbd> > <kbd>Tools</kbd> > <kbd>Debugger M
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Server Port | 0 (auto) | Set specific port or 0 for auto-assign |
-| Max History Size | 100 | Maximum number of commands to keep in history |
-| Auto-scroll | true | Auto-scroll to new commands in history |
-| Show Notifications | true | Show notifications for server events |
+| Server Host | 127.0.0.1 | Bind address for the MCP server. Use `127.0.0.1` for localhost only, `0.0.0.0` for all interfaces, or a custom IP |
+| Server Port | IDE-specific | Each IDE has a unique default port (e.g., 29190 for IntelliJ, 29192 for PyCharm). Range: 1024-65535 |
+| Max History Size | 1000 | Maximum number of commands to keep in history |
 
 ## Requirements
 
 - **JetBrains IDE** 2025.1 or later (any IDE based on IntelliJ Platform)
 - **JVM** 21 or later
-- **MCP Protocol** 2024-11-05
+- **MCP Protocol** 2025-03-26 (Streamable HTTP, primary) with 2024-11-05 (SSE, legacy) fallback
 
 ### Supported IDEs
 
 **Fully tested**: IntelliJ IDEA, PyCharm, WebStorm, GoLand, RustRover, Android Studio, PhpStorm
-**May work** (untested): RubyMine, CLion, DataGrip
+**May work** (untested): RubyMine, CLion, DataGrip, Aqua, DataSpell, Rider
 
 ## Architecture
 
-The plugin supports **dual MCP transports** on the IDE's built-in web server:
+The plugin runs an embedded Ktor CIO server on an IDE-specific port and supports **three MCP transports**:
 
-### SSE Transport (MCP Inspector, spec-compliant clients)
+### Streamable HTTP Transport (Primary, MCP 2025-03-26)
+
+```
+AI Assistant ──────► POST /debugger-mcp/streamable-http   (JSON-RPC with Mcp-Session-Id header)
+                     ◄── JSON-RPC response                (immediate HTTP response)
+             ──────► DELETE /debugger-mcp/streamable-http  (session termination)
+```
+
+### Legacy SSE Transport (MCP 2024-11-05)
 
 ```
 AI Assistant ──────► GET /debugger-mcp/sse           (establish SSE stream)
@@ -366,19 +406,20 @@ AI Assistant ──────► GET /debugger-mcp/sse           (establish SS
                      ◄── event: message              (JSON-RPC response via SSE)
 ```
 
-### Streamable HTTP Transport (Claude Code, simple clients)
+### Stateless HTTP (Convenience)
 
 ```
-AI Assistant ──────► POST /debugger-mcp              (JSON-RPC requests)
+AI Assistant ──────► POST /debugger-mcp              (JSON-RPC requests, no session)
                      ◄── JSON-RPC response           (immediate HTTP response)
 ```
 
-This dual approach:
-- **MCP Inspector compatible** - Full SSE transport per MCP spec (2024-11-05)
-- **Claude Code compatible** - Streamable HTTP for simple request/response
-- Requires no additional ports or processes
+This approach:
+- **Modern clients** - Streamable HTTP with session management per MCP 2025-03-26 spec
+- **Legacy clients** - Full SSE transport per MCP 2024-11-05 spec
+- **Simple clients** - Stateless HTTP for quick request/response without sessions
+- Each IDE gets a unique default port to avoid conflicts when multiple IDEs run simultaneously
 - Works with any MCP-compatible client
-- Automatically adapts to the IDE's server port
+- Supports CORS for browser-based clients
 
 ## Contributing
 
