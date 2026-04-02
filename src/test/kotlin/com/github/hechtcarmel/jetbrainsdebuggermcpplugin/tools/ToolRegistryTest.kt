@@ -154,10 +154,10 @@ class ToolRegistryTest {
     }
 
     @Test
-    fun `registerBuiltInTools registers exactly 22 tools`() {
+    fun `registerBuiltInTools registers exactly 23 tools`() {
         registry.registerBuiltInTools()
 
-        assertEquals(22, registry.getToolCount())
+        assertEquals(23, registry.getToolCount())
     }
 
     @Test
@@ -179,13 +179,14 @@ class ToolRegistryTest {
         assertNotNull(registry.getTool("set_breakpoint"))
         assertNotNull(registry.getTool("remove_breakpoint"))
 
-        // Execution Control Tools (6)
+        // Execution Control Tools (7)
         assertNotNull(registry.getTool("resume_execution"))
         assertNotNull(registry.getTool("pause_execution"))
         assertNotNull(registry.getTool("step_over"))
         assertNotNull(registry.getTool("step_into"))
         assertNotNull(registry.getTool("step_out"))
         assertNotNull(registry.getTool("run_to_line"))
+        assertNotNull(registry.getTool("wait_for_pause"))
 
         // Stack Frame Tools (3)
         assertNotNull(registry.getTool("get_stack_trace"))

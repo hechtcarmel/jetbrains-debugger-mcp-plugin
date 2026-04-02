@@ -5,7 +5,7 @@ description: >-
   TRIGGER when ANY of these MCP tools are available: list_run_configurations, execute_run_configuration,
   start_debug_session, stop_debug_session, get_debug_session_status, list_debug_sessions,
   set_breakpoint, remove_breakpoint, list_breakpoints, resume_execution, pause_execution,
-  step_over, step_into, step_out, run_to_line, get_stack_trace, select_stack_frame,
+  step_over, step_into, step_out, run_to_line, wait_for_pause, get_stack_trace, select_stack_frame,
   list_threads, get_variables, set_variable, get_source_context, evaluate_expression.
   Use when debugging any application, investigating bugs, tracing execution flow, inspecting
   runtime state, or when the user says "debug", "breakpoint", "step through", "inspect variable",
@@ -42,23 +42,22 @@ Use these tools to **actually debug** applications in a JetBrains IDE rather tha
 1. list_run_configurations          -- Find a config with can_debug: true
 2. set_breakpoint                   -- Set breakpoint(s) BEFORE starting
 3. start_debug_session              -- Launch the debugger
-4. get_debug_session_status         -- Check if session started (state: "running")
-5. [wait for breakpoint hit]        -- Call get_debug_session_status to poll
-6. get_debug_session_status         -- When paused: see variables, stack, source in ONE call
-7. evaluate_expression              -- Test hypotheses about values
-8. step_over / step_into / step_out -- Navigate through code
-9. get_debug_session_status         -- Inspect state after each step
-10. resume_execution                -- Continue to next breakpoint or end
-11. stop_debug_session              -- Clean up when done
+4. wait_for_pause(timeout=60)       -- Block until breakpoint hit (returns full status)
+5. evaluate_expression              -- Test hypotheses about values
+6. step_over / step_into / step_out -- Navigate through code
+7. wait_for_pause(timeout=10)       -- Wait for step to complete, get state
+8. resume_execution                 -- Continue to next breakpoint
+9. wait_for_pause(timeout=60)       -- Block until next breakpoint hit
+10. stop_debug_session              -- Clean up when done
 ```
 
 ### Critical Rules
 
 1. **Set breakpoints BEFORE starting the session.** Breakpoints can be set without an active session. Setting them first ensures the program pauses where you need it.
 
-2. **Always use `get_debug_session_status` as your primary inspection tool.** It returns variables, stack trace, source context, and current location in ONE call. Do NOT call `get_variables`, `get_stack_trace`, and `get_source_context` separately unless you need specific parameters (e.g., a different frame index or more context lines).
+2. **After `resume_execution` or any step command, use `wait_for_pause` to block until the session pauses.** It returns the full session status (variables, stack, source, location) when the pause occurs — no polling needed. Step/resume commands return immediately with `newState: "running"` and do NOT wait for the program to pause.
 
-3. **After `resume_execution` or any step command, poll `get_debug_session_status`** to check when the session has paused again. The step/resume commands return immediately with `newState: "running"` - they do NOT wait for the program to pause.
+3. **Use `get_debug_session_status` to re-inspect state without waiting.** It returns variables, stack trace, source context, and current location in ONE call. Do NOT call `get_variables`, `get_stack_trace`, and `get_source_context` separately unless you need specific parameters (e.g., a different frame index or more context lines).
 
 4. **Line numbers are 1-based.** When setting breakpoints or using `run_to_line`, use the line numbers as they appear in the editor (starting from 1).
 
@@ -74,19 +73,19 @@ Use these tools to **actually debug** applications in a JetBrains IDE rather tha
 ```
 1. set_breakpoint at the line where the wrong value is used
 2. start_debug_session with the appropriate run configuration
-3. get_debug_session_status (poll until state: "paused")
+3. wait_for_pause(timeout=60) -- blocks until breakpoint hit, returns full status
 4. Inspect variables in the response -- the wrong value and its inputs are visible
 5. evaluate_expression to test alternative calculations
 6. If the value was already wrong here, set_breakpoint earlier in the call chain
-7. resume_execution and repeat
+7. resume_execution, then wait_for_pause(timeout=60) -- repeat
 ```
 
 ### Pattern: Debug a Specific Loop Iteration
 ```
 1. set_breakpoint with condition (e.g., condition: "i == 50")
 2. start_debug_session
-3. resume_execution -- debugger runs at full speed until condition is true
-4. get_debug_session_status -- inspect state at exactly iteration 50
+3. wait_for_pause(timeout=120) -- debugger runs at full speed until condition is true
+4. Inspect variables in the response -- state at exactly iteration 50
 ```
 
 ### Pattern: Trace Execution Without Stopping
@@ -120,10 +119,10 @@ Use these tools to **actually debug** applications in a JetBrains IDE rather tha
 |---------|-----------------|
 | Calling `get_variables` + `get_stack_trace` + `get_source_context` separately | Use `get_debug_session_status` -- returns all three in one call |
 | Starting debug session without setting breakpoints first | Set breakpoints BEFORE `start_debug_session` |
-| Assuming `step_over` returns the new state | Call `get_debug_session_status` after stepping to see where you are |
+| Assuming `step_over` returns the new state | Call `wait_for_pause` after stepping to block until paused and get the new state |
 | Using 0-based line numbers | Line numbers are **1-based** (as shown in the editor) |
 | Using relative file paths | Always use **absolute** file paths |
-| Not polling after `resume_execution` | The program may take time to hit the next breakpoint -- poll `get_debug_session_status` |
+| Not waiting after `resume_execution` | Use `wait_for_pause` to block until the next breakpoint is hit |
 | Calling `evaluate_expression` with method calls in Rust/C++/Go | Use `get_variables` for native languages; method calls may fail in LLDB/GDB |
 | Guessing variable values from source code | Use the debugger to inspect actual runtime values |
 | Forgetting to `stop_debug_session` when done | Always clean up debug sessions |
@@ -155,6 +154,7 @@ These use native debuggers (LLDB/GDB) with restrictions:
 | `remove_breakpoint` | Remove a breakpoint | No |
 | `list_breakpoints` | See all breakpoints | No |
 | `resume_execution` | Continue running | **Yes** |
+| `wait_for_pause` | Block until session pauses, return full status | No |
 | `pause_execution` | Pause running program | No (must be running) |
 | `step_over` | Next line (skip into functions) | **Yes** |
 | `step_into` | Enter function call | **Yes** |

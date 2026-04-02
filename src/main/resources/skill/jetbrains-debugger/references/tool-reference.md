@@ -202,6 +202,18 @@ Continue execution until a specific line is reached.
 
 **Requires:** Session paused. **New state:** "running" (will pause at target line)
 
+### `wait_for_pause`
+Wait for a debug session to pause (breakpoint hit, exception, or manual pause). Returns the full session status when paused, equivalent to calling `get_debug_session_status`. Use after `resume_execution` or any execution control tool to avoid manual polling.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `session_id` | string | No | Session ID |
+| `timeout` | integer | **Yes** | Maximum wait time in seconds (must be positive) |
+| `breakpoint_ids` | string[] | No | Only complete when one of these breakpoints is hit. Non-matching breakpoint pauses are auto-resumed. Exception/manual pauses always return immediately. |
+| `project_path` | string | No | Project path |
+
+**Returns:** `waitResult` ("paused"/"timeout"/"session_stopped"), `message`, plus full session status (sessionId, name, state, pausedReason, currentLocation, breakpointHit, stackSummary, variables, sourceContext, currentThread)
+
 ---
 
 ## Stack & Threads

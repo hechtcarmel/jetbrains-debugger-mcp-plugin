@@ -92,3 +92,27 @@ data class SourceLine(
     val content: String,
     val isCurrent: Boolean = false
 )
+
+/**
+ * Result of wait_for_pause tool.
+ *
+ * Wraps DebugSessionStatus with a waitResult field indicating
+ * why the wait completed.
+ */
+@Serializable
+data class WaitForPauseResult(
+    val waitResult: String,
+    val message: String,
+    val sessionId: String,
+    val name: String,
+    val state: String,
+    val pausedReason: String? = null,
+    val currentLocation: SourceLocation? = null,
+    val breakpointHit: BreakpointHitInfo? = null,
+    val stackSummary: List<StackFrameInfo> = emptyList(),
+    val totalStackDepth: Int = 0,
+    val variables: List<VariableInfo> = emptyList(),
+    val sourceContext: SourceContext? = null,
+    val currentThread: ThreadInfo? = null,
+    val threadCount: Int = 0
+)
