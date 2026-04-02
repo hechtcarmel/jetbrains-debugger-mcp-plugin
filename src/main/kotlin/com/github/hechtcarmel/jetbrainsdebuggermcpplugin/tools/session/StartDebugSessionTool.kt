@@ -70,9 +70,9 @@ class StartDebugSessionTool : AbstractMcpTool() {
             }
 
             // Wait for the session to be created (with timeout)
-            val newSession = withTimeoutOrNull(5000L) {
+            val newSession = withTimeoutOrNull(30000L) {
                 while (true) {
-                    delay(100)
+                    delay(1000)
                     val sessions = getDebuggerManager(project).debugSessions
                     if (sessions.size > sessionCountBefore) {
                         val newest = sessions.lastOrNull()

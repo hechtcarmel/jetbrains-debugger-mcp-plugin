@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-04-02
+
+### Added
+- **`wait_for_pause` tool** - Blocks until a debug session pauses (breakpoint, exception, or manual pause) and returns the full session status. Eliminates manual polling loops after `resume_execution` or `start_debug_session`. Supports optional `breakpoint_ids` filter to wait for specific breakpoints.
+- **Automatic session discovery** - `wait_for_pause` can be called immediately after `start_debug_session` without needing to poll for the session ID first.
+
 ## [4.1.0] - 2026-03-14
 
 ### Added

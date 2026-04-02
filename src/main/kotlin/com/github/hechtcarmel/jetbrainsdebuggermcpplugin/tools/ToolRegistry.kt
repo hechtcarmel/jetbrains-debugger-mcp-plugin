@@ -11,6 +11,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.RunToLi
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepIntoTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepOutTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepOverTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.WaitForPauseTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.navigation.GetSourceContextTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.ListRunConfigurationsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.RunConfigurationTool
@@ -77,6 +78,7 @@ class ToolRegistry {
         // Execution Control Tools (P1)
         register(StepOutTool())
         register(RunToLineTool())
+        register(WaitForPauseTool())
 
         // Stack Frame Tools (P0)
         register(GetStackTraceTool())

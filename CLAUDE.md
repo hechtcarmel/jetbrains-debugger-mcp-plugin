@@ -13,8 +13,8 @@ IMPORTANT: When debugging, prefer using jetbrains-debugger MCP tools to interact
 1. **Discover configurations**: `list_run_configurations` to see available run/debug configs
 2. **Start debugging**: `start_debug_session` with a configuration that has `can_debug: true`
 3. **Set breakpoints**: `set_breakpoint` at locations of interest
-4. **Resume and wait**: `resume_execution` to run until a breakpoint is hit
-5. **Inspect state**: `get_debug_session_status` returns variables, stack trace, and source context in one call
+4. **Resume and wait**: `resume_execution` then `wait_for_pause` with a timeout to block until a breakpoint is hit
+5. **Inspect state**: `wait_for_pause` returns variables, stack trace, and source context automatically. Use `get_debug_session_status` if you need to re-inspect without waiting.
 6. **Evaluate expressions**: `evaluate_expression` to test hypotheses
 7. **Step through code**: `step_over`, `step_into`, `step_out` as needed
 8. **Repeat steps 5-7** until the issue is found
@@ -47,6 +47,7 @@ IMPORTANT: When debugging, prefer using jetbrains-debugger MCP tools to interact
 | `step_into` | Step into function call |
 | `step_out` | Step out of current function |
 | `run_to_line` | Run until specific line is reached |
+| `wait_for_pause` | Wait for session to pause (breakpoint, exception, manual). Returns full status. |
 
 ### Inspection
 | Tool | Description |
