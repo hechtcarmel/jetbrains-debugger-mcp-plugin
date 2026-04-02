@@ -10,6 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebugSessionListener
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -36,6 +37,7 @@ class WaitForPauseTool : AbstractMcpTool() {
         Waits for a debug session to pause (breakpoint hit, exception, or manual pause). Returns the full session status when paused, equivalent to calling get_debug_session_status.
         Use after resume_execution, start_debug_session, or any execution control tool to avoid manual polling.
         The timeout parameter is required and specifies the maximum wait time in seconds.
+        If session_id is omitted and no session exists yet (e.g., right after start_debug_session), the tool will wait for a session to appear before waiting for it to pause. This means you can call start_debug_session followed by wait_for_pause without needing to poll for the session ID.
         Optionally filter by breakpoint_ids to only return when specific breakpoints are hit — non-matching breakpoint pauses are auto-resumed.
     """.trimIndent()
 
@@ -100,8 +102,10 @@ class WaitForPauseTool : AbstractMcpTool() {
         putJsonObject("properties") {
             val (propName, propSchema) = projectPathProperty()
             put(propName, propSchema)
-            val (sessionName, sessionSchema) = sessionIdProperty()
-            put(sessionName, sessionSchema)
+            putJsonObject("session_id") {
+                put("type", "string")
+                put("description", "Debug session ID. If omitted, uses the current session. If no session exists yet, waits for one to appear (useful right after start_debug_session).")
+            }
             putJsonObject("timeout") {
                 put("type", "integer")
                 put("description", "Maximum wait time in seconds. Must be positive.")
@@ -110,7 +114,7 @@ class WaitForPauseTool : AbstractMcpTool() {
             putJsonObject("breakpoint_ids") {
                 put("type", "array")
                 putJsonObject("items") { put("type", "string") }
-                put("description", "If set, only complete when one of these breakpoints is hit. Non-matching breakpoint pauses are auto-resumed. Exception and manual pauses always return immediately regardless of filter.")
+                put("description", "If set, only complete when one of these breakpoints is hit. Non-matching breakpoint pauses are auto-resumed. Pauses where no breakpoint is detected at the current location (e.g., exceptions, manual pauses) return immediately. Note: detection uses file/line heuristics and may not distinguish all pause causes perfectly.")
             }
         }
         put("required", buildJsonArray {
@@ -130,10 +134,13 @@ class WaitForPauseTool : AbstractMcpTool() {
         }
 
         val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
+            ?: if (sessionId != null) {
+                return createErrorResult("Session not found: $sessionId")
+            } else {
+                // No session yet — wait for one to appear (e.g., after start_debug_session)
+                awaitSession(project, timeoutSeconds * 1000L)
+                    ?: return createErrorResult("No debug session appeared within ${timeoutSeconds}s")
+            }
 
         if (session.isStopped) {
             return createJsonResult(buildStoppedResult(session))
@@ -262,6 +269,22 @@ class WaitForPauseTool : AbstractMcpTool() {
             name = session.sessionName,
             state = "stopped"
         )
+    }
+
+    /**
+     * Waits for a debug session to appear in the project.
+     * Polls every 1 second, up to the given timeout.
+     */
+    private suspend fun awaitSession(project: Project, timeoutMs: Long): XDebugSession? {
+        return withTimeoutOrNull(timeoutMs) {
+            while (true) {
+                val session = getCurrentSession(project)
+                if (session != null) return@withTimeoutOrNull session
+                delay(1000)
+            }
+            @Suppress("UNREACHABLE_CODE")
+            null
+        }
     }
 
     private sealed class WaitOutcome {

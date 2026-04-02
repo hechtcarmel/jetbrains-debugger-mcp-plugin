@@ -52,7 +52,7 @@ Start a new debug session for a run configuration.
 
 **Returns:** `status` ("started"/"starting"), `session` (DebugSessionInfo), `message`
 
-**Note:** Polls for up to 5 seconds for the session to start. The session may still be in "starting" state.
+**Note:** Polls for up to 30 seconds for the session to start. The session may still be in "starting" state for very slow targets.
 
 ### `stop_debug_session`
 Stop/terminate a debug session.
@@ -203,13 +203,15 @@ Continue execution until a specific line is reached.
 **Requires:** Session paused. **New state:** "running" (will pause at target line)
 
 ### `wait_for_pause`
-Wait for a debug session to pause (breakpoint hit, exception, or manual pause). Returns the full session status when paused, equivalent to calling `get_debug_session_status`. Use after `resume_execution` or any execution control tool to avoid manual polling.
+Wait for a debug session to pause (breakpoint hit, exception, or manual pause). Returns the full session status when paused, equivalent to calling `get_debug_session_status`. Use after `resume_execution`, `start_debug_session`, or any execution control tool to avoid manual polling.
+
+If `session_id` is omitted and no session exists yet, the tool waits for a session to appear before waiting for it to pause. This means you can call `start_debug_session` followed by `wait_for_pause` without needing to poll for the session ID.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `session_id` | string | No | Session ID |
+| `session_id` | string | No | Session ID. If omitted, uses current session. If no session exists yet, waits for one to appear. |
 | `timeout` | integer | **Yes** | Maximum wait time in seconds (must be positive) |
-| `breakpoint_ids` | string[] | No | Only complete when one of these breakpoints is hit. Non-matching breakpoint pauses are auto-resumed. Exception/manual pauses always return immediately. |
+| `breakpoint_ids` | string[] | No | Only complete when one of these breakpoints is hit. Non-matching breakpoint pauses are auto-resumed. Pauses where no breakpoint is detected at the current location return immediately. Uses file/line heuristics — may not distinguish all pause causes perfectly. |
 | `project_path` | string | No | Project path |
 
 **Returns:** `waitResult` ("paused"/"timeout"/"session_stopped"), `message`, plus full session status (sessionId, name, state, pausedReason, currentLocation, breakpointHit, stackSummary, variables, sourceContext, currentThread)
