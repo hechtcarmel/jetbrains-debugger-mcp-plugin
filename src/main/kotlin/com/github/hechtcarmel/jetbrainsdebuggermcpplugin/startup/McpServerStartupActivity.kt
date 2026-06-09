@@ -3,12 +3,14 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.startup
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.McpServerService
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.build.BuildStatusTracker
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.IdeProductInfo
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
@@ -21,9 +23,16 @@ class McpServerStartupActivity : ProjectActivity {
     }
 
     override suspend fun execute(project: Project) {
+        System.err.println("[DebuggerMCP] Startup activity executing for project: ${project.name}")
         LOG.info("MCP Server startup activity executing for project: ${project.name}")
 
         try {
+            // Initialize BuildStatusTracker early to subscribe to build events
+            // This must be done before any build starts so we can capture all events
+            project.service<BuildStatusTracker>()
+            System.err.println("[DebuggerMCP] BuildStatusTracker initialized for project: ${project.name}")
+            LOG.info("BuildStatusTracker initialized for project: ${project.name}")
+
             // Check for v2.0.0 migration
             val settings = McpSettings.getInstance()
             if (settings.needsV2Migration()) {
@@ -57,6 +66,7 @@ class McpServerStartupActivity : ProjectActivity {
             }
 
         } catch (e: Exception) {
+            System.err.println("[DebuggerMCP] FAILED to start MCP Server: ${e.message}")
             LOG.error("Failed to start MCP Server", e)
 
             NotificationGroupManager.getInstance()

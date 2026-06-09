@@ -4,6 +4,10 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolDefin
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.ListBreakpointsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.RemoveBreakpointTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.SetBreakpointTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.build.GetBuildOutputTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.build.GetBuildStatusTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.build.StartBuildTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.build.WaitForBuildTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.EvaluateTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.PauseTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.ResumeTool
@@ -98,5 +102,11 @@ class ToolRegistry {
 
         // Evaluation Tools
         register(EvaluateTool())
+
+        // Build Tools
+        register(GetBuildStatusTool())
+        register(GetBuildOutputTool())
+        register(StartBuildTool())
+        register(WaitForBuildTool())
     }
 }

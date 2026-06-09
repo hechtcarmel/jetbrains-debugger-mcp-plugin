@@ -48,17 +48,21 @@ object McpConstants {
     fun getServerName(): String = IdeProductInfo.getServerName()
 
     const val SERVER_VERSION = "4.0.0"
-    const val SERVER_DESCRIPTION = """Debug applications running in JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.) through programmatic control.
+    const val SERVER_DESCRIPTION = """Debug applications running in JetBrains IDEs (IntelliJ, PyCharm, WebStorm, Rider, etc.) through programmatic control.
 
 When to use: Use this server when you need to:
 - Set breakpoints and step through code to understand execution flow
 - Inspect and modify variable values during debugging
 - Evaluate expressions in the context of paused execution
 - Navigate stack traces and threads to diagnose issues
+- Trigger builds and check compilation results (errors, warnings)
+- Wait for builds to complete and retrieve detailed error messages
 
 Requirements: An open JetBrains IDE with a debuggable project. The IDE must be running with this plugin installed.
 
-Typical workflow: list_run_configurations -> start_debug_session -> set_breakpoint -> resume_execution -> get_debug_session_status (when paused) -> get_variables / evaluate_expression"""
+Typical workflows:
+1. Debug: list_run_configurations -> start_debug_session -> set_breakpoint -> resume_execution -> get_debug_session_status (when paused) -> get_variables / evaluate_expression
+2. Build: start_build -> wait_for_build -> get_build_output (to see errors)"""
 
     /**
      * Topic for server status change notifications.

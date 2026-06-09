@@ -100,6 +100,8 @@ for detailed documentation and examples.</p>
     <depends>com.intellij.modules.xdebugger</depends>
     <!-- Optional Java debugger support -->
     <depends optional="true" config-file="java-debugger.xml">com.intellij.java</depends>
+    <!-- Optional Rider support for .NET build tracking -->
+    <depends optional="true">com.jetbrains.rider.frontend</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <!-- Application-level service for MCP server -->
@@ -120,6 +122,10 @@ for detailed documentation and examples.</p>
         <!-- Project-level service for command history -->
         <projectService
             serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandHistoryService"/>
+
+        <!-- Project-level service for build status tracking -->
+        <projectService
+            serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.build.BuildStatusTracker"/>
 
         <!-- Startup Activity -->
         <postStartupActivity implementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.startup.McpServerStartupActivity"/>
