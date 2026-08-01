@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### Fixed
+- `set_variable` now applies the Evaluate Expression safety mode to `new_value`. It previously evaluated the value as a code fragment without consulting the safety guard at all, so a blocked operation could be run by passing it as a variable value instead of an expression — bypassing Read-only mode and the risky-operation blocklist entirely.
+- `get_variables`, `get_debug_session_status` and `wait_for_pause` now declare every field they actually return in their output schemas. `wait_for_pause` and `get_debug_session_status` each omitted `breakpointHit`, `totalStackDepth`, `currentThread` and `threadCount`; `get_variables` omitted `scope`. MCP clients that validate `structuredContent` against the declared schema would reject those responses.
+- The tool window's **Refresh** button now works. It searched for the panel as the tool window's content component, but the content is a wrapper panel, so the button did nothing at all.
+- The server version reported to MCP clients during `initialize` was pinned at `4.0.0` while the plugin shipped 4.3.x. It now tracks the real plugin version, and a test keeps the two in sync.
+
+### Changed
+- Test suite rebuilt around golden contracts for the client-facing surface (23 tool schemas, 31 result-model wire shapes) and conformance tests that drive the real server over HTTP. Removed ~1,850 lines of tests that could not fail for any production reason, along with two dead source files (`util/JsonUtils.kt`, `util/ProjectUtils.kt`) that had no callers.
+- `CLAUDE.md` no longer documents the structured error codes `session_not_found`, `session_not_paused`, `breakpoint_not_found`, `invalid_location` and `evaluation_error`. No tool has ever emitted them; the real error contract is documented in their place, along with the suite's known gaps.
+
 ## [4.3.1]
 
 ### Fixed

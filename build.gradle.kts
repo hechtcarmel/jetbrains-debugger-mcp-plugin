@@ -158,6 +158,20 @@ tasks {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
 
+    test {
+        // A silently-skipped test is indistinguishable from a passing one in the console.
+        testLogging {
+            events("skipped", "failed")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
+
+        // Gradle's -D lands on the daemon, not the forked test JVM, so the golden-file
+        // regeneration flag has to be forwarded explicitly.
+        providers.systemProperty("contract.update").orNull?.let {
+            systemProperty("contract.update", it)
+        }
+    }
+
     publishPlugin {
         dependsOn(patchChangelog)
     }

@@ -2,7 +2,9 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.variable
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.EvaluateExpressionSafetyGuard
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetVariableResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.EvaluatorUtils
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.FrameVariablesCollector
@@ -80,6 +82,26 @@ class SetVariableTool : AbstractMcpTool() {
 
         val evaluator = currentFrame.evaluator
             ?: return createErrorResult("No evaluator available - cannot modify variable")
+
+        // `new_value` is evaluated as a code fragment by the same evaluator `evaluate_expression`
+        // uses, so it has to clear the same safety gate. Without this, the blocklist could be
+        // sidestepped entirely by passing the payload as a variable value instead of an
+        // expression. Only the value is checked, not the synthesized `name = value` assignment:
+        // the assignment is this tool's whole purpose, and validating it would make set_variable
+        // unusable in every mode above Unrestricted.
+        val settings = McpSettings.getInstance()
+        val safetyViolation = EvaluateExpressionSafetyGuard.validate(
+            expression = newValue,
+            mode = settings.evaluateExpressionSafetyMode,
+            context = EvaluateExpressionSafetyGuard.Context(
+                project = project,
+                sourcePosition = currentFrame.sourcePosition
+            ),
+            customRules = settings.customEvaluateExpressionBlockRules
+        )
+        if (safetyViolation != null) {
+            return createErrorResult(safetyViolation.toUserMessage())
+        }
 
         val assignmentExpression = "$variableName = $newValue"
         val setResult = evaluateAssignment(evaluator, assignmentExpression)

@@ -1,0 +1,1407 @@
+# MCP tool manifest — golden snapshot
+# Regenerate: ./gradlew test --tests "*ToolManifestContractTest" -Dcontract.update=true
+# tools: 23
+
+## evaluate_expression
+description:
+  Evaluates an arbitrary expression in the current debug context and returns the result.
+  Use to compute values, call methods, or inspect complex expressions. Can modify state if the expression has side effects.
+  Evaluation is filtered by the IDE's Evaluate Expression safety mode unless it is set to Unrestricted.
+  
+  **Language limitations:** Native debuggers (LLDB/GDB) used for Rust, C++, and Go have limited expression evaluation. Method calls (e.g., `s.len()`, `vec.size()`) may not work. Variable inspection works well. Full expression support is available in Java, Kotlin, Python, and JavaScript.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Evaluate Expression"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "expression": {
+        "description": "Expression to evaluate in the current context. Can be a variable name, method call, arithmetic, or complex expression. May be blocked by the IDE's Evaluate Expression safety mode. Examples: 'x', 'list.size()', 'a + b * 2', 'String.format(\"%d\", count)'",
+        "type": "string"
+      },
+      "frame_index": {
+        "default": 0,
+        "description": "Stack frame index for evaluation context (0 = current frame)",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "expression"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## execute_run_configuration
+description:
+  Executes a run configuration in either 'run' or 'debug' mode.
+  Use when you need to run or debug a specific configuration. For debugging with full session tracking, prefer start_debug_session instead.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Execute Configuration"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "mode": {
+        "default": "debug",
+        "description": "Execution mode: 'debug' (default) or 'run'",
+        "enum": [
+          "debug",
+          "run"
+        ],
+        "type": "string"
+      },
+      "name": {
+        "description": "Name of the run configuration to execute",
+        "type": "string"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## get_debug_session_status
+description:
+  Returns the complete current state of a debug session: execution location, variables, stack trace, and surrounding source code.
+  This is the primary tool for understanding where execution stopped and why. Use after any execution control operation (resume, step, pause) to see the result.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "Get Debug Status"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "include_source_context": {
+        "default": true,
+        "description": "Include source code around current line",
+        "type": "boolean"
+      },
+      "include_variables": {
+        "default": true,
+        "description": "Include variables from current frame",
+        "type": "boolean"
+      },
+      "max_stack_frames": {
+        "default": 10,
+        "description": "Maximum stack frames in summary",
+        "maximum": 200,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      },
+      "source_context_lines": {
+        "default": 5,
+        "description": "Lines of context above/below current line",
+        "maximum": 50,
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  {
+    "properties": {
+      "breakpointHit": {
+        "description": "The breakpoint at the current location, when the pause was caused by one",
+        "properties": {
+          "breakpointId": {
+            "type": "string"
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hitCount": {
+            "type": "integer"
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "currentLocation": {
+        "description": "Current execution location",
+        "properties": {
+          "className": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "methodName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "currentThread": {
+        "description": "The thread the debugger is currently focused on",
+        "properties": {
+          "frameCount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "name": {
+        "description": "Display name of the debug session",
+        "type": "string"
+      },
+      "pausedReason": {
+        "description": "Why execution paused: 'breakpoint', 'step', 'exception', or 'pause'",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sessionId": {
+        "description": "Unique identifier for the debug session",
+        "type": "string"
+      },
+      "sourceContext": {
+        "description": "Source code around the current execution point",
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "stackSummary": {
+        "description": "Stack trace summary",
+        "items": {
+          "properties": {
+            "className": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "file": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "index": {
+              "type": "integer"
+            },
+            "line": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "methodName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": {
+        "description": "Current state: 'running', 'paused', or 'stopped'",
+        "type": "string"
+      },
+      "threadCount": {
+        "description": "Number of threads reported for the session",
+        "type": "integer"
+      },
+      "totalStackDepth": {
+        "description": "Number of frames reported in stackSummary",
+        "type": "integer"
+      },
+      "variables": {
+        "description": "Variables visible in current stack frame",
+        "items": {
+          "properties": {
+            "hasChildren": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "sessionId",
+      "name",
+      "state"
+    ],
+    "type": "object"
+  }
+
+## get_source_context
+description:
+  Returns source code lines around a specific location or the current execution point.
+  Use to see the code context without switching to the IDE. Shows line numbers and indicates which lines have breakpoints.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "Get Source Context"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "file_path": {
+        "description": "Absolute path to the source file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources). If not provided, uses current debug position.",
+        "type": "string"
+      },
+      "line": {
+        "description": "Center line number (1-based). If not provided with file_path, uses current position.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "lines_after": {
+        "default": 5,
+        "description": "Number of source lines to include after the target line. Use larger values to see more of the upcoming code.",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "lines_before": {
+        "default": 5,
+        "description": "Number of source lines to include before the target line. Use larger values when you need more context to understand the code flow.",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## get_stack_trace
+description:
+  Returns the call stack showing how execution reached the current point.
+  Use to understand the sequence of function calls. Each frame includes file, line, class, and method information.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "Get Stack Trace"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "max_frames": {
+        "default": 50,
+        "description": "Maximum number of frames to return",
+        "maximum": 200,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  {
+    "properties": {
+      "frames": {
+        "description": "Stack frames from current (0) to oldest",
+        "items": {
+          "properties": {
+            "className": {
+              "description": "Fully qualified class name",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "file": {
+              "description": "Absolute path to source file",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "index": {
+              "description": "Frame index (0 = current/topmost)",
+              "type": "integer"
+            },
+            "isCurrent": {
+              "description": "True if this is the current frame",
+              "type": "boolean"
+            },
+            "isLibrary": {
+              "description": "True if this frame is in library code",
+              "type": "boolean"
+            },
+            "line": {
+              "description": "Line number (1-based)",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "methodName": {
+              "description": "Method or function name",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "sessionId": {
+        "description": "Debug session ID",
+        "type": "string"
+      },
+      "threadId": {
+        "description": "Thread ID or name",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "totalFrames": {
+        "description": "Total number of frames returned",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "sessionId",
+      "frames",
+      "totalFrames"
+    ],
+    "type": "object"
+  }
+
+## get_variables
+description:
+  Returns all variables visible in the current (or specified) stack frame.
+  Use to inspect local variables, parameters, and accessible fields. For complex objects, use evaluate_expression to see their contents.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "Get Variables"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "frame_index": {
+        "default": 0,
+        "description": "Stack frame index (0 = current frame)",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  {
+    "properties": {
+      "frameIndex": {
+        "description": "Stack frame index that variables were retrieved from",
+        "type": "integer"
+      },
+      "scope": {
+        "description": "Scope filter that produced this list, if one was requested",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sessionId": {
+        "description": "Debug session ID",
+        "type": "string"
+      },
+      "variables": {
+        "description": "List of variables visible in the stack frame",
+        "items": {
+          "properties": {
+            "hasChildren": {
+              "description": "True if this variable has child properties",
+              "type": "boolean"
+            },
+            "name": {
+              "description": "Variable name",
+              "type": "string"
+            },
+            "type": {
+              "description": "Variable type name",
+              "type": "string"
+            },
+            "value": {
+              "description": "String representation of the value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "value",
+            "type",
+            "hasChildren"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "sessionId",
+      "frameIndex",
+      "variables"
+    ],
+    "type": "object"
+  }
+
+## list_breakpoints
+description:
+  Lists all breakpoints in the project with their locations, conditions, and states.
+  Use to discover breakpoint IDs for removal, or to verify breakpoints are configured correctly before debugging.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "List Breakpoints"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## list_debug_sessions
+description:
+  Lists all active debug sessions with their IDs, names, and states.
+  Use to discover session IDs when multiple debug sessions are running, or to check which session is current.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "List Debug Sessions"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## list_run_configurations
+description:
+  Lists all available run/debug configurations in the project.
+  Use this first to discover which configurations can be debugged before calling start_debug_session.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "List Run Configurations"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## list_threads
+description:
+  Lists all threads in the debugged process with their states.
+  Use in multi-threaded applications to see which threads exist and which is currently selected.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "List Threads"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## pause_execution
+description:
+  Pauses a running debug session at its current execution point.
+  Use when you need to inspect state during execution. After pausing, use get_debug_session_status to see the current location.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Pause Execution"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## remove_breakpoint
+description:
+  Removes a breakpoint by its ID.
+  Use list_breakpoints first to find the breakpoint ID. This operation is idempotent.
+annotations:
+  {
+    "destructiveHint": true,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Remove Breakpoint"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "breakpoint_id": {
+        "description": "ID of the breakpoint to remove",
+        "type": "string"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "breakpoint_id"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## resume_execution
+description:
+  Resumes program execution from a paused state.
+  Execution continues until the next breakpoint, exception, or program completion. Use get_debug_session_status afterward to see where execution stopped.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Resume Execution"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## run_to_line
+description:
+  Continues execution until reaching a specific line in a file.
+  Use as a shortcut instead of setting a temporary breakpoint. Execution may stop earlier if another breakpoint is hit.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Run to Line"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "file_path": {
+        "description": "Absolute path to the source file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources).",
+        "type": "string"
+      },
+      "line": {
+        "description": "Target line number (1-based). Execution will pause when this line is about to execute. The line must be reachable from the current execution path.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "file_path",
+      "line"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## select_stack_frame
+description:
+  Changes the current stack frame context for variable inspection and expression evaluation.
+  Use to inspect variables in a caller's scope. Frame 0 is the current function; higher indices are callers.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Select Stack Frame"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "frame_index": {
+        "description": "Index of the stack frame to select (0 = topmost)",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "frame_index"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## set_breakpoint
+description:
+  Sets a breakpoint at a specific file and line number, optionally with conditions or logging.
+  Use to pause execution at specific code locations. Execution will stop when the breakpoint is hit (unless using log-only mode with suspend_policy='none').
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Set Breakpoint"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "condition": {
+        "description": "Boolean expression that must evaluate to true for the breakpoint to pause execution. Uses the target language syntax (e.g., 'count > 10', 'name.equals(\"test\")'). Evaluated each time the line is reached.",
+        "type": "string"
+      },
+      "enabled": {
+        "default": true,
+        "description": "Whether breakpoint is enabled",
+        "type": "boolean"
+      },
+      "file_path": {
+        "description": "Absolute path to the file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources).",
+        "type": "string"
+      },
+      "line": {
+        "description": "1-based line number",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "log_message": {
+        "description": "Message to log when breakpoint is hit (tracepoint). Use {expression} syntax to include evaluated values (e.g., 'x={x}, y={y}'). When set with suspend_policy='none', creates a non-stopping logpoint.",
+        "type": "string"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "suspend_policy": {
+        "default": "all",
+        "description": "Thread suspend policy: 'all' suspends all threads (default), 'thread' suspends only the current thread, 'none' logs without stopping (use with log_message for logpoints)",
+        "enum": [
+          "all",
+          "thread",
+          "none"
+        ],
+        "type": "string"
+      },
+      "temporary": {
+        "default": false,
+        "description": "Remove after first hit",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "file_path",
+      "line"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## set_variable
+description:
+  Changes the value of a variable during debugging.
+  Use to test different values or fix incorrect state. Supports primitives, strings, and simple expressions. This modifies the running program's state.
+  
+  **Language limitations:** Native debuggers (LLDB/GDB) used for Rust, C++, and Go have limited support for modifying complex types like strings, collections, or heap-allocated values. Works best in languages with full debug support (Java, Kotlin, Python, JavaScript).
+annotations:
+  {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Set Variable"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "new_value": {
+        "description": "New value as a string expression. For primitives: '42', '3.14', 'true'. For strings: '\"hello\"' (with quotes). For null: 'null'. Can also be an expression that evaluates to the target type.",
+        "type": "string"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      },
+      "variable_name": {
+        "description": "Name of the variable to modify",
+        "type": "string"
+      }
+    },
+    "required": [
+      "variable_name",
+      "new_value"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## start_debug_session
+description:
+  Starts a new debug session for a specified run configuration and returns the session ID.
+  Use this to begin debugging. Call list_run_configurations first to discover available configurations.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Start Debug Session"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "configuration_name": {
+        "description": "Name of the run configuration to debug",
+        "type": "string"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "configuration_name"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## step_into
+description:
+  Steps into the function call on the current line, entering the function body.
+  Use when you need to debug inside a function. If no function call exists on the current line, behaves like step_over.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Step Into"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## step_out
+description:
+  Continues execution until the current function returns, then pauses at the caller.
+  Use to exit a function you've stepped into without stepping through every remaining line.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Step Out"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## step_over
+description:
+  Executes the current line and stops at the next line, without entering function calls.
+  Use for line-by-line debugging when you don't need to inspect function internals. Check get_debug_session_status for the new location.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Step Over"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## stop_debug_session
+description:
+  Terminates a debug session, stopping the debugged process.
+  Use to end a debugging session. This is a destructive operation that cannot be undone.
+annotations:
+  {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Stop Debug Session"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## wait_for_pause
+description:
+  Waits for a debug session to pause (breakpoint hit, exception, or manual pause). Returns the full session status when paused, equivalent to calling get_debug_session_status.
+  Use after resume_execution, start_debug_session, or any execution control tool to avoid manual polling.
+  The timeout parameter is required and specifies the maximum wait time in seconds.
+  If session_id is omitted and no session exists yet (e.g., right after start_debug_session), the tool will wait for a session to appear before waiting for it to pause. This means you can call start_debug_session followed by wait_for_pause without needing to poll for the session ID.
+  Optionally filter by breakpoint_ids to only return when specific breakpoints are hit — non-matching breakpoint pauses are auto-resumed.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Wait For Pause"
+  }
+inputSchema:
+  {
+    "additionalProperties": false,
+    "properties": {
+      "breakpoint_ids": {
+        "description": "If set, only complete when one of these breakpoints is hit. Non-matching breakpoint pauses are auto-resumed. Pauses where no breakpoint is detected at the current location (e.g., exceptions, manual pauses) return immediately. Note: detection uses file/line heuristics and may not distinguish all pause causes perfectly.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. If omitted, uses the current session. If no session exists yet, waits for one to appear (useful right after start_debug_session).",
+        "type": "string"
+      },
+      "timeout": {
+        "description": "Maximum wait time in seconds. Must be positive.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "timeout"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  {
+    "properties": {
+      "breakpointHit": {
+        "description": "The breakpoint at the current location, when the pause was caused by one",
+        "properties": {
+          "breakpointId": {
+            "type": "string"
+          },
+          "condition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hitCount": {
+            "type": "integer"
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "currentLocation": {
+        "description": "Current execution location",
+        "properties": {
+          "className": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "methodName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "currentThread": {
+        "description": "The thread the debugger is currently focused on",
+        "properties": {
+          "frameCount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "message": {
+        "description": "Human-readable description of the wait outcome",
+        "type": "string"
+      },
+      "name": {
+        "description": "Debug session display name",
+        "type": "string"
+      },
+      "pausedReason": {
+        "description": "Why execution paused: 'breakpoint', 'step', 'exception', or 'pause'",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "sessionId": {
+        "description": "Debug session ID",
+        "type": "string"
+      },
+      "sourceContext": {
+        "description": "Source code around the current execution point",
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "stackSummary": {
+        "description": "Stack trace summary",
+        "items": {
+          "properties": {
+            "className": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "file": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "index": {
+              "type": "integer"
+            },
+            "line": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "methodName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": {
+        "description": "Session state: 'running', 'paused', or 'stopped'",
+        "type": "string"
+      },
+      "threadCount": {
+        "description": "Number of threads reported for the session",
+        "type": "integer"
+      },
+      "totalStackDepth": {
+        "description": "Number of frames reported in stackSummary",
+        "type": "integer"
+      },
+      "variables": {
+        "description": "Variables visible in current stack frame",
+        "items": {
+          "properties": {
+            "hasChildren": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "waitResult": {
+        "description": "Why the wait completed: 'paused', 'timeout', or 'session_stopped'",
+        "type": "string"
+      }
+    },
+    "required": [
+      "waitResult",
+      "message",
+      "sessionId",
+      "name",
+      "state"
+    ],
+    "type": "object"
+  }

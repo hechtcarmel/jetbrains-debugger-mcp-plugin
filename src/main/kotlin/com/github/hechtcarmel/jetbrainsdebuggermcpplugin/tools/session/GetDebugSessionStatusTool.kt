@@ -81,6 +81,38 @@ class GetDebugSessionStatusTool : AbstractMcpTool() {
                 putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
                 put("description", "Source code around the current execution point")
             }
+            putJsonObject("breakpointHit") {
+                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
+                putJsonObject("properties") {
+                    putJsonObject("breakpointId") { put("type", "string") }
+                    putJsonObject("type") { put("type", "string") }
+                    putJsonObject("file") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
+                    putJsonObject("line") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
+                    putJsonObject("condition") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
+                    putJsonObject("hitCount") { put("type", "integer") }
+                }
+                put("description", "The breakpoint at the current location, when the pause was caused by one")
+            }
+            putJsonObject("totalStackDepth") {
+                put("type", "integer")
+                put("description", "Number of frames reported in stackSummary")
+            }
+            putJsonObject("currentThread") {
+                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
+                putJsonObject("properties") {
+                    putJsonObject("id") { put("type", "string") }
+                    putJsonObject("name") { put("type", "string") }
+                    putJsonObject("state") { put("type", "string") }
+                    putJsonObject("isCurrent") { put("type", "boolean") }
+                    putJsonObject("group") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
+                    putJsonObject("frameCount") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
+                }
+                put("description", "The thread the debugger is currently focused on")
+            }
+            putJsonObject("threadCount") {
+                put("type", "integer")
+                put("description", "Number of threads reported for the session")
+            }
         }
         put("required", buildJsonArray { add(JsonPrimitive("sessionId")); add(JsonPrimitive("name")); add(JsonPrimitive("state")) })
     }

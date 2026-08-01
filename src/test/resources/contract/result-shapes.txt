@@ -1,0 +1,274 @@
+# MCP result shapes — golden snapshot
+# Regenerate: ./gradlew test --tests "*ResultShapeContractTest" -Dcontract.update=true
+#
+# Wire keys are plain Kotlin property names — renaming a property IS a breaking
+# change for every MCP client. 'optional' means the property has a Kotlin default;
+# production serializes with encodeDefaults=true, so optional fields are still
+# emitted. StreamableHttpTransportTest pins the bytes actually sent to a client.
+# shapes: 31
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandEntryExport
+kind: CLASS
+  id: STRING [required,non-null]
+  timestamp: STRING [required,non-null]
+  toolName: STRING [required,non-null]
+  parameters: MAP [required,non-null]
+  status: STRING [required,non-null]
+  result: STRING [nullable]
+  error: STRING [nullable]
+  durationMs: LONG [nullable]
+  affectedFiles: LIST [nullable]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
+kind: CLASS
+  title: STRING [nullable,optional]
+  readOnlyHint: BOOLEAN [nullable,optional]
+  destructiveHint: BOOLEAN [nullable,optional]
+  idempotentHint: BOOLEAN [nullable,optional]
+  openWorldHint: BOOLEAN [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
+kind: CLASS
+  content: LIST [required,non-null]
+  isError: BOOLEAN [optional]
+  structuredContent: MAP [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolDefinition
+kind: CLASS
+  name: STRING [required,non-null]
+  description: STRING [required,non-null]
+  inputSchema: MAP [required,non-null]
+  outputSchema: MAP [nullable,optional]
+  annotations: CLASS [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.BreakpointListResult
+kind: CLASS
+  breakpoints: LIST [required,non-null]
+  totalCount: INT [required,non-null]
+  enabledCount: INT [required,non-null]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.BreakpointHitInfo
+kind: CLASS
+  breakpointId: STRING [required,non-null]
+  type: STRING [required,non-null]
+  file: STRING [nullable,optional]
+  line: INT [nullable,optional]
+  condition: STRING [nullable,optional]
+  hitCount: INT [optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.BreakpointInfo
+kind: CLASS
+  id: STRING [required,non-null]
+  type: STRING [required,non-null]
+  file: STRING [nullable,optional]
+  line: INT [nullable,optional]
+  enabled: BOOLEAN [optional]
+  condition: STRING [nullable,optional]
+  logMessage: STRING [nullable,optional]
+  suspendPolicy: STRING [nullable,optional]
+  hitCount: INT [optional]
+  temporary: BOOLEAN [optional]
+  exceptionClass: STRING [nullable,optional]
+  caught: BOOLEAN [nullable,optional]
+  uncaught: BOOLEAN [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.DebugSessionInfo
+kind: CLASS
+  id: STRING [required,non-null]
+  name: STRING [required,non-null]
+  state: STRING [required,non-null]
+  isCurrent: BOOLEAN [required,non-null]
+  runConfigurationName: STRING [nullable,optional]
+  processId: LONG [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.DebugSessionStatus
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  name: STRING [required,non-null]
+  state: STRING [required,non-null]
+  pausedReason: STRING [nullable,optional]
+  currentLocation: CLASS [nullable,optional]
+  breakpointHit: CLASS [nullable,optional]
+  stackSummary: LIST [optional]
+  totalStackDepth: INT [optional]
+  variables: LIST [optional]
+  sourceContext: CLASS [nullable,optional]
+  currentThread: CLASS [nullable,optional]
+  threadCount: INT [optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.EvaluateResponse
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  frameIndex: INT [required,non-null]
+  result: CLASS [required,non-null]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.EvaluationResult
+kind: CLASS
+  expression: STRING [required,non-null]
+  value: STRING [required,non-null]
+  type: STRING [required,non-null]
+  hasChildren: BOOLEAN [optional]
+  error: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ExecutionControlResult
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  action: STRING [required,non-null]
+  status: STRING [required,non-null]
+  message: STRING [required,non-null]
+  newState: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RemoveBreakpointResult
+kind: CLASS
+  breakpointId: STRING [required,non-null]
+  status: STRING [required,non-null]
+  message: STRING [required,non-null]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationInfo
+kind: CLASS
+  name: STRING [required,non-null]
+  type: STRING [required,non-null]
+  typeId: STRING [required,non-null]
+  isTemporary: BOOLEAN [optional]
+  canRun: BOOLEAN [optional]
+  canDebug: BOOLEAN [optional]
+  folder: STRING [nullable,optional]
+  description: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationListResult
+kind: CLASS
+  configurations: LIST [required,non-null]
+  activeConfiguration: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationResult
+kind: CLASS
+  configurationName: STRING [required,non-null]
+  mode: STRING [required,non-null]
+  status: STRING [required,non-null]
+  message: STRING [required,non-null]
+  sessionId: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SelectFrameResult
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  frameIndex: INT [required,non-null]
+  frame: CLASS [required,non-null]
+  message: STRING [required,non-null]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetBreakpointResult
+kind: CLASS
+  breakpointId: STRING [required,non-null]
+  status: STRING [required,non-null]
+  verified: BOOLEAN [required,non-null]
+  message: STRING [required,non-null]
+  file: STRING [nullable,optional]
+  line: INT [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetVariableResult
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  variableName: STRING [required,non-null]
+  oldValue: STRING [required,non-null]
+  newValue: STRING [required,non-null]
+  type: STRING [required,non-null]
+  message: STRING [required,non-null]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SourceContext
+kind: CLASS
+  file: STRING [required,non-null]
+  startLine: INT [required,non-null]
+  endLine: INT [required,non-null]
+  currentLine: INT [required,non-null]
+  lines: LIST [required,non-null]
+  breakpointsInView: LIST [optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SourceLine
+kind: CLASS
+  number: INT [required,non-null]
+  content: STRING [required,non-null]
+  isCurrent: BOOLEAN [optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SourceLocation
+kind: CLASS
+  file: STRING [required,non-null]
+  line: INT [required,non-null]
+  className: STRING [nullable,optional]
+  methodName: STRING [nullable,optional]
+  signature: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StackFrameInfo
+kind: CLASS
+  index: INT [required,non-null]
+  file: STRING [nullable,optional]
+  line: INT [nullable,optional]
+  className: STRING [nullable,optional]
+  methodName: STRING [nullable,optional]
+  isCurrent: BOOLEAN [optional]
+  isLibrary: BOOLEAN [optional]
+  presentation: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StackTraceResult
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  threadId: STRING [nullable,optional]
+  frames: LIST [required,non-null]
+  totalFrames: INT [required,non-null]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StopSessionResult
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  status: STRING [required,non-null]
+  message: STRING [required,non-null]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ThreadInfo
+kind: CLASS
+  id: STRING [required,non-null]
+  name: STRING [required,non-null]
+  state: STRING [required,non-null]
+  isCurrent: BOOLEAN [optional]
+  group: STRING [nullable,optional]
+  frameCount: INT [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ThreadListResult
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  threads: LIST [required,non-null]
+  currentThreadId: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.VariableInfo
+kind: CLASS
+  name: STRING [required,non-null]
+  value: STRING [required,non-null]
+  type: STRING [required,non-null]
+  hasChildren: BOOLEAN [optional]
+  scope: STRING [nullable,optional]
+  declaredType: STRING [nullable,optional]
+  isStatic: BOOLEAN [optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.VariablesResult
+kind: CLASS
+  sessionId: STRING [required,non-null]
+  frameIndex: INT [required,non-null]
+  variables: LIST [required,non-null]
+  scope: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.WaitForPauseResult
+kind: CLASS
+  waitResult: STRING [required,non-null]
+  message: STRING [required,non-null]
+  sessionId: STRING [required,non-null]
+  name: STRING [required,non-null]
+  state: STRING [required,non-null]
+  pausedReason: STRING [nullable,optional]
+  currentLocation: CLASS [nullable,optional]
+  breakpointHit: CLASS [nullable,optional]
+  stackSummary: LIST [optional]
+  totalStackDepth: INT [optional]
+  variables: LIST [optional]
+  sourceContext: CLASS [nullable,optional]
+  currentThread: CLASS [nullable,optional]
+  threadCount: INT [optional]
+
+## text
+kind: CLASS
+  text: STRING [required,non-null]
