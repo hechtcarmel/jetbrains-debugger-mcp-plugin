@@ -60,7 +60,30 @@ class McpConstantsTest {
     fun `server version follows semver pattern`() {
         val semverRegex = Regex("""\d+\.\d+\.\d+(-[\w.]+)?""")
         assertTrue(semverRegex.matches(McpConstants.SERVER_VERSION))
-        assertEquals("4.0.0", McpConstants.SERVER_VERSION)
+    }
+
+    /**
+     * `SERVER_VERSION` is what the plugin reports to MCP clients in `initialize`, so it has to be
+     * the version the plugin actually ships.
+     *
+     * It had drifted to `4.0.0` while the plugin shipped 4.3.1 — and the previous version of this
+     * test asserted the literal `"4.0.0"`, which meant the suite actively prevented the constant
+     * from being corrected. Comparing against `gradle.properties` instead makes the constant
+     * impossible to leave behind.
+     */
+    @Test
+    fun `server version matches the shipped plugin version`() {
+        val pluginVersion = java.io.File("gradle.properties").readLines()
+            .firstOrNull { it.trimStart().startsWith("pluginVersion") }
+            ?.substringAfter('=')?.trim()
+
+        assertNotNull("Could not read pluginVersion from gradle.properties", pluginVersion)
+        assertEquals(
+            "McpConstants.SERVER_VERSION is reported to every MCP client during initialize and " +
+                "must match gradle.properties' pluginVersion.",
+            pluginVersion,
+            McpConstants.SERVER_VERSION
+        )
     }
 
     @Test

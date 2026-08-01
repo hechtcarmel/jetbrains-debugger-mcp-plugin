@@ -159,13 +159,31 @@ If omitted with multiple projects, tools return an error listing available proje
 
 ## Error Handling
 
-Tools return structured errors:
-- `session_not_found` - Invalid session_id
-- `session_not_paused` - Operation requires paused session
-- `breakpoint_not_found` - Invalid breakpoint_id
-- `invalid_location` - Cannot set breakpoint at location
-- `multiple_projects_open` - Must specify project_path
-- `evaluation_error` - Expression evaluation failed
+A failing tool returns a **successful** JSON-RPC result whose payload carries `isError: true` and
+a human-readable message in `content[0].text` — never a JSON-RPC `error` object. That is
+deliberate: the model can read the message and act on it, whereas a protocol error surfaces to the
+user as a hard transport failure.
+
+Most messages are free-form prose, and the exact strings are pinned by the test suite because they
+are the only failure signal a client gets. Representative examples:
+
+- `No active debug session`
+- `Session not found: <id>`
+- `Session must be paused to <verb>`
+- `Missing required parameter: <name>`
+- `File not found: <path>. For files inside JAR archives, use the '!/' separator ...`
+- `Cannot set breakpoint at <path>:<line> (not a valid breakpoint location)`
+
+**Project resolution** is the one place that returns a structured payload — a JSON object with
+`error`, `message` and `available_projects` keys, where `error` is one of:
+
+- `no_project_open` - No project is open in the IDE
+- `project_not_found` - No open project matches the supplied `project_path`
+- `multiple_projects_open` - Several projects are open and `project_path` was omitted
+
+> Earlier revisions of this file also listed `session_not_found`, `session_not_paused`,
+> `breakpoint_not_found`, `invalid_location` and `evaluation_error` as structured error codes. No
+> tool has ever emitted them. Do not write agent logic that branches on those strings.
 
 ## Language-Specific Limitations
 
@@ -195,6 +213,89 @@ These languages use native debuggers (LLDB/GDB) with some limitations:
 - JetBrains IDE (IntelliJ IDEA, PyCharm, WebStorm, RustRover, CLion, GoLand, etc.)
 - IDE must have an open project with a debuggable run configuration
 - This plugin must be installed and enabled
+
+---
+
+## Developer Guide: Testing
+
+```bash
+./gradlew test    # whole suite, platform tests included — ~40s headless
+```
+
+Run it before pushing. There is no separate "fast tier": the suite is small enough that splitting
+it would cost more than it saves.
+
+### How the suite is organised
+
+| Layer | Location | What it protects |
+|-------|----------|------------------|
+| **Golden contracts** | `contract/` | The client-facing surface: 23 tool schemas, 31 result-model wire shapes |
+| **Transport conformance** | `server/transport/` | Every route, status code, header, Origin decision and SSE frame, over real HTTP |
+| **Tool behaviour** | `tools/**/*BehaviorTest` | What a tool actually does to IDE state |
+| **Unit** | everything else | Pure logic — log-message transforms, safety analysis, value presentation |
+
+### Golden contract files
+
+`src/test/resources/contract/` holds two snapshots that exist to make a large refactor safe:
+
+- `tool-manifest.txt` — every tool's name, description, input schema, output schema and annotations
+- `result-shapes.txt` — every result model's wire keys, JSON kinds, nullability and optionality
+
+They are a **contract with MCP clients**. Result models use plain Kotlin property names as wire
+keys — there is exactly one `@SerialName` in `src/main` — so an IDE "Rename" on a result property
+is a source-compatible change that silently breaks every client. The snapshot is what catches it.
+
+Changing them is sometimes correct, but must always be deliberate:
+
+```bash
+./gradlew test --tests "*ToolManifestContractTest" -Dcontract.update=true
+```
+
+Review the resulting diff as part of the change, and treat it as the list of breaking changes the
+release notes owe clients.
+
+### Writing transport or tool-behaviour tests
+
+Extend `McpHttpTestCase`. It boots the real `KtorMcpServer` on a free port and drives it with the
+JDK's `java.net.http.HttpClient` (no Ktor client dependency needed).
+
+**Wrap any tool call that mutates IDE state in `pumpingEdt { ... }`.** `BasePlatformTestCase` runs
+test methods *on the EDT*, and tools like `set_breakpoint` hop onto the EDT themselves — so a plain
+blocking HTTP call deadlocks, surfacing as a misleading 30-second `HttpTimeoutException`.
+
+Write fixture files to disk under `project.basePath`, not via `myFixture.addFileToProject`:
+`VirtualFileResolver` resolves through `LocalFileSystem`, which cannot see the in-memory
+`TempFileSystem`.
+
+### Known gaps — green does not mean covered
+
+Stated plainly so nobody mistakes the suite for more than it is:
+
+- **No live debug session.** Nothing starts a real debuggee, so the paused-state paths of
+  `get_variables`, `evaluate_expression`, `step_*`, `get_stack_trace` and `wait_for_pause` are
+  covered only for their error branches and their utility layers. The three breakpoint tools are
+  the only ones with real success-path behaviour coverage.
+- **`SessionStatusCollector` reports a degraded view**, and the tests pin that rather than the
+  documented ideal: `stackSummary` returns at most the current frame regardless of
+  `max_stack_frames`, `totalStackDepth` is 1 or 0, `currentThread` is hardcoded to `main`,
+  `threadCount` to 1, and `BreakpointHitInfo.hitCount` is always 0.
+- **Pause-reason detection is a file/line heuristic.** It returns only `breakpoint` or `step`,
+  never `exception` or `pause`, though the output schema advertises all four.
+- **The evaluate-expression guard has known bypasses**, none of them fixed here: interpolated
+  string templates (Kotlin `"${...}"`, JS backticks, Python f-strings) are blanked before scanning;
+  an unbalanced quote blanks everything after it; only the first 10,000 characters are scanned; and
+  the blocklist is JVM-specific, so `os.system`, `require('child_process')` and similar pass
+  unblocked. `set_variable` and `evaluate_expression` both consult the guard —
+  `SafetyGuardCoverageTest` fails if a third evaluating tool appears without one.
+- **Breakpoint conditions and log messages** are evaluated by the debugger without passing through
+  the guard.
+- **`log_message` falls back to Java syntax** for Rust, Go, Swift, C and C++, producing expressions
+  those debuggers cannot evaluate.
+- **`set_breakpoint` contains a hardcoded `delay(100)`** after the async toggle. Under load it can
+  report "Failed to create breakpoint" for one that does get created.
+- **UI is barely covered.** `McpToolWindowPanel` eagerly resolves `McpServerService` and does not
+  survive the light fixture, so `ToolWindowActionsTest` checks `RefreshAction` at the source level
+  rather than by driving a real tool window.
 
 ---
 

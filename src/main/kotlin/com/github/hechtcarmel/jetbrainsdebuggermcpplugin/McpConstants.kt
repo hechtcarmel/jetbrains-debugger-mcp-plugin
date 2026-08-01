@@ -47,7 +47,7 @@ object McpConstants {
     @JvmStatic
     fun getServerName(): String = IdeProductInfo.getServerName()
 
-    const val SERVER_VERSION = "4.0.0"
+    const val SERVER_VERSION = "4.4.0"
     const val SERVER_DESCRIPTION = """Debug applications running in JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.) through programmatic control.
 
 When to use: Use this server when you need to:

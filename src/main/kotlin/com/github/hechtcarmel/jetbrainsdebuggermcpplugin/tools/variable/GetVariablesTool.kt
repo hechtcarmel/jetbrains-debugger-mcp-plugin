@@ -16,6 +16,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
@@ -50,6 +51,10 @@ class GetVariablesTool : AbstractMcpTool() {
                     put("required", buildJsonArray { add(JsonPrimitive("name")); add(JsonPrimitive("value")); add(JsonPrimitive("type")); add(JsonPrimitive("hasChildren")) })
                 }
                 put("description", "List of variables visible in the stack frame")
+            }
+            putJsonObject("scope") {
+                putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) }
+                put("description", "Scope filter that produced this list, if one was requested")
             }
         }
         put("required", buildJsonArray { add(JsonPrimitive("sessionId")); add(JsonPrimitive("frameIndex")); add(JsonPrimitive("variables")) })

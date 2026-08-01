@@ -1,5 +1,6 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history
 
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -166,14 +167,43 @@ class CommandHistoryServiceTest : BasePlatformTestCase() {
         assertTrue(lines[1].contains("SUCCESS"))
     }
 
-    fun `test history trims to max size`() {
-        // Default max history size is 1000, so adding 150 entries won't trigger trim
-        repeat(150) { i ->
-            historyService.recordCommand(createTestEntry("tool_$i"))
-        }
+    /**
+     * Exercises the ring-buffer eviction in `trimHistoryIfNeeded`.
+     *
+     * The previous version of this test recorded 150 entries against the default limit of 1000 and
+     * asserted `150 == 150` — it was named "trims to max size" while never crossing the threshold,
+     * so the trimming logic was entirely unverified while appearing covered. The limit is lowered
+     * here so eviction actually happens.
+     */
+    fun `test history evicts the oldest entries once the max size is exceeded`() {
+        val settings = McpSettings.getInstance()
+        val originalMax = settings.maxHistorySize
+        settings.maxHistorySize = 5
+        try {
+            repeat(8) { i -> historyService.recordCommand(createTestEntry("tool_$i")) }
 
-        // History size should be exactly 150 since it's under the default limit
-        assertEquals("History should contain all entries", 150, historyService.entries.size)
+            val entries = historyService.entries
+            assertEquals("History must be capped at the configured maximum", 5, entries.size)
+            assertEquals(
+                "Eviction must drop the oldest entries and keep the newest, newest-first",
+                listOf("tool_7", "tool_6", "tool_5", "tool_4", "tool_3"),
+                entries.map { it.toolName }
+            )
+        } finally {
+            settings.maxHistorySize = originalMax
+        }
+    }
+
+    fun `test history keeps every entry while under the max size`() {
+        val settings = McpSettings.getInstance()
+        val originalMax = settings.maxHistorySize
+        settings.maxHistorySize = 10
+        try {
+            repeat(4) { i -> historyService.recordCommand(createTestEntry("tool_$i")) }
+            assertEquals(4, historyService.entries.size)
+        } finally {
+            settings.maxHistorySize = originalMax
+        }
     }
 
     private fun createTestEntry(toolName: String): CommandEntry {
