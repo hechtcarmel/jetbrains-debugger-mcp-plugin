@@ -77,6 +77,13 @@ class SessionStatusCollectorTest : BasePlatformTestCase() {
         }
     }
 
+    private fun addTracepoint(line: Int): XLineBreakpoint<*> =
+        addBreakpoint(line).also {
+            WriteAction.runAndWait<RuntimeException> {
+                it.suspendPolicy = com.intellij.xdebugger.breakpoints.SuspendPolicy.NONE
+            }
+        }
+
     private fun position(line: Int): XSourcePosition =
         requireNotNull(XDebuggerUtil.getInstance().createPosition(file, line))
 
@@ -129,6 +136,41 @@ class SessionStatusCollectorTest : BasePlatformTestCase() {
 
         assertEquals("step", SessionStatusCollector.determinePauseReason(session))
         assertNull(SessionStatusCollector.getBreakpointHitInfo(session))
+    }
+
+    /**
+     * A `suspend_policy: none` tracepoint logs without ever suspending, so it can never be the
+     * cause of a pause. Before the filter, stepping onto a tracepoint's line reported
+     * `pausedReason: "breakpoint"` with the tracepoint as the hit — live-QA finding 4.2.
+     */
+    fun `test a suspend-none tracepoint on the pause line is not reported as hit`() {
+        addTracepoint(line = 4)
+        val session = pausedSession(topLine = 4)
+
+        assertNull(SessionStatusCollector.getBreakpointHitInfo(session))
+        assertEquals("step", SessionStatusCollector.determinePauseReason(session))
+    }
+
+    // ── Frame presentation (live-QA 4.1) ────────────────────────────────────────────────
+
+    /**
+     * `presentation` must carry the same 1-based line as the machine-readable `line` field.
+     * The platform's `XStackFrame.toString()` encodes a 0-based line, which shipped as an
+     * off-by-one in every frame's prose — live-QA finding 4.1.
+     */
+    fun `test frame presentation uses the one-based line of the source position`() {
+        val presentation = StackFrameUtils.formatPresentation(frameAt(line = 4))
+
+        assertEquals("${file.name}:5", presentation)
+    }
+
+    fun `test frame presentation falls back to toString for frames without a position`() {
+        val frame = object : XStackFrame() {
+            override fun getSourcePosition(): XSourcePosition? = null
+            override fun toString(): String = "native frame, position unknown"
+        }
+
+        assertEquals("native frame, position unknown", StackFrameUtils.formatPresentation(frame))
     }
 
     fun `test an enabled breakpoint on the pause line is reported with its condition`() {

@@ -35,6 +35,27 @@ object StackFrameUtils {
     }
 
     /**
+     * Human-readable one-line summary of a frame, derived from the same source position the
+     * machine-readable fields use.
+     *
+     * The platform's `XStackFrame.toString()` encodes a 0-based line number, which reads as
+     * off-by-one next to the 1-based `line` field it shipped alongside (live-QA finding 4.1) —
+     * so it is used only as the fallback for frames with no source position, where there is no
+     * line to disagree with.
+     */
+    fun formatPresentation(frame: XStackFrame): String {
+        val position = frame.sourcePosition ?: return frame.toString()
+        val location = "${position.file.name}:${position.line + 1}"
+        val className = extractClassName(frame)?.substringAfterLast('.')
+        val methodName = extractMethodName(frame)
+        return if (className != null && methodName != null) {
+            "$className.$methodName($location)"
+        } else {
+            location
+        }
+    }
+
+    /**
      * Gets a stack frame at a specific index from a debug session.
      * Returns null if the frame is not found or timeout occurs.
      *

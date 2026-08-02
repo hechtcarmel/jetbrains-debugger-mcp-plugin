@@ -31,7 +31,7 @@ Execute a run configuration in debug or run mode.
 | `name` | string | **Yes** | | Configuration name (exact match) |
 | `mode` | string | No | `"debug"` | `"debug"` or `"run"` |
 
-**Returns:** `status`, `configurationName`, `mode`, `message`
+**Returns:** `status`, `configurationName`, `mode`, `message`, `sessionId` (null in `run` mode — no debugger attaches)
 
 ### `list_debug_sessions`
 List all active debug sessions.
@@ -78,7 +78,7 @@ Get comprehensive session state in a single call. **Use this as the first inspec
 
 **Returns:**
 - `sessionId`, `name`, `state` ("running", "paused", "stopped")
-- `pausedReason` ("breakpoint", "step", "exception", "pause") - null if running
+- `pausedReason` - null if running. In practice `"breakpoint"` or `"step"` (detection is a pause-site heuristic; `"exception"`/`"pause"` are declared in the schema but not yet distinguished — a manual pause reports `"step"`)
 - `currentLocation` (file, line, className, methodName) - null if not paused
 - `breakpointHit` (breakpoint info) - null if not hit
 - `stackSummary[]` (index, file, line, className, methodName)
@@ -99,6 +99,8 @@ List all breakpoints in the project.
 | `project_path` | string | No | Project path |
 
 **Returns:** `breakpoints[]` (id, type, file, line, enabled, condition, logMessage, suspendPolicy, hitCount, temporary), `totalCount`, `enabledCount`
+
+**Note:** `hitCount` is always `0` — the platform exposes no hit-count accessor for language-agnostic breakpoints.
 
 ### `set_breakpoint`
 Set a line breakpoint with optional conditions or log messages.
@@ -121,8 +123,11 @@ Set a line breakpoint with optional conditions or log messages.
 - Kotlin: `"x={x}"` becomes `"x=$x"`
 - Python: `"x={x}"` becomes `f"x={x}"`
 - JS/TS: `"x={x}"` becomes `` `x=${x}` ``
+- Rust / Go / Swift / C / C++: `{expression}` placeholders are **rejected** at `set_breakpoint` — those debuggers cannot evaluate the generated expressions. A message that is a single bare `{expr}` passes through as the raw expression; anything else needs a plain, placeholder-free message.
 
-**Tracepoint:** Set `suspend_policy: "none"` with a `log_message` to log without stopping.
+**Safety:** `condition` and each `log_message` `{expression}` pass through the same safety guard as `evaluate_expression`; a blocked expression fails the `set_breakpoint` call and nothing is created.
+
+**Tracepoint:** Set `suspend_policy: "none"` with a `log_message` to log without stopping. A tracepoint is never reported as `breakpointHit` — it cannot be the cause of a pause.
 
 ### `remove_breakpoint`
 Remove a breakpoint by its ID.
@@ -214,7 +219,7 @@ If `session_id` is omitted and no session exists yet, the tool waits for a sessi
 | `breakpoint_ids` | string[] | No | Only complete when one of these breakpoints is hit. Non-matching breakpoint pauses are auto-resumed. Pauses where no breakpoint is detected at the current location return immediately. Uses file/line heuristics — may not distinguish all pause causes perfectly. |
 | `project_path` | string | No | Project path |
 
-**Returns:** `waitResult` ("paused"/"timeout"/"session_stopped"), `message`, plus full session status (sessionId, name, state, pausedReason, currentLocation, breakpointHit, stackSummary, variables, sourceContext, currentThread)
+**Returns:** `waitResult` ("paused"/"timeout"/"session_stopped"), `message`, plus full session status (sessionId, name, state, pausedReason, currentLocation, breakpointHit, stackSummary, variables, sourceContext, currentThread, threadCount)
 
 ---
 
@@ -333,6 +338,8 @@ Evaluate an expression in the current debug context.
 - `Read-only`: includes the default blocklist and custom regex rules, then rejects assignments, increment/decrement, code fragments, constructors, and method calls that cannot be proven read-only
 
 Custom regex block rules apply in `Default blocklist` and `Read-only`, never in `Unrestricted`. They match after comments and string literals are removed.
+
+In `Default blocklist` and `Read-only`, expressions containing **interpolated string templates** (Kotlin `${...}`, JS backticks, Python f-strings, Ruby `#{...}`), unterminated string literals, or more than 10,000 characters are rejected outright — the guard cannot see inside them, so it refuses rather than guesses. Rewrite without interpolation (e.g. plain concatenation or a bare reference).
 
 **Limitations for native languages (Rust, C++, Go, Swift):**
 - Variable inspection works

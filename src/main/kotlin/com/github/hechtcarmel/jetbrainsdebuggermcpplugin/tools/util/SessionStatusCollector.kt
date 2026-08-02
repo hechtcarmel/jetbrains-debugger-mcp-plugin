@@ -8,6 +8,7 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XSourcePosition
+import com.intellij.xdebugger.breakpoints.SuspendPolicy
 import com.intellij.xdebugger.breakpoints.XBreakpointProperties
 import com.intellij.xdebugger.breakpoints.XBreakpointType
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
@@ -90,7 +91,10 @@ object SessionStatusCollector {
     /**
      * The breakpoint that can explain the current pause. The pause site is the *top* frame's
      * position — select_stack_frame changes currentStackFrame, and the answer must not change
-     * with it. Muted or disabled breakpoints cannot have fired, so they never match.
+     * with it. Muted or disabled breakpoints cannot have fired, so they never match — and neither
+     * can a `suspend_policy: none` tracepoint, which logs without ever suspending; before this
+     * filter, stepping onto a tracepoint's line was misattributed to the tracepoint
+     * (live-QA finding 4.2).
      */
     private fun findEnabledBreakpointAt(session: XDebugSession, position: XSourcePosition): XLineBreakpoint<*>? {
         if (session.areBreakpointsMuted()) return null
@@ -105,7 +109,7 @@ object SessionStatusCollector {
                     position.line
                 )
             }
-            .firstOrNull { it.isEnabled }
+            .firstOrNull { it.isEnabled && it.suspendPolicy != SuspendPolicy.NONE }
     }
 
     suspend fun getVariables(frame: XStackFrame?): List<VariableInfo> {
@@ -136,7 +140,7 @@ object SessionStatusCollector {
                 methodName = StackFrameUtils.extractMethodName(frame),
                 isCurrent = if (currentFrame != null) frame == currentFrame else index == 0,
                 isLibrary = StackFrameUtils.isLibraryPath(path),
-                presentation = frame.toString().take(100)
+                presentation = StackFrameUtils.formatPresentation(frame).take(100)
             )
         }
     }

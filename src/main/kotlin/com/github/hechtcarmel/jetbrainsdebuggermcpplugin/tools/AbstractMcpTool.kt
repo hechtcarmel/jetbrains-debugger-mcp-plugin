@@ -238,15 +238,17 @@ abstract class AbstractMcpTool : McpTool {
      * This is the recommended method for tools that accept an optional session_id parameter.
      *
      * @param project The project context
-     * @param sessionId Optional session ID. If null, returns current session.
+     * @param sessionId Optional session ID. If null, returns the current session — or, when the
+     *   IDE has no notion of a "current" one, the only session there is.
      * @return The resolved session, or null if no session available
      */
     protected fun resolveSession(project: Project, sessionId: String?): XDebugSession? {
-        return if (sessionId != null) {
-            getSessionById(project, sessionId)
-        } else {
-            getCurrentSession(project)
-        }
+        if (sessionId != null) return getSessionById(project, sessionId)
+        // currentSession tracks debugger-UI focus and is only assigned once a session pauses or
+        // its tab is selected. A session that is running and has never paused therefore is not
+        // "current" — and pause_execution against it would report "No active debug session"
+        // even though exactly one session exists. A single session is unambiguous; use it.
+        return getCurrentSession(project) ?: getAllSessions(project).singleOrNull { !it.isStopped }
     }
 
     /**

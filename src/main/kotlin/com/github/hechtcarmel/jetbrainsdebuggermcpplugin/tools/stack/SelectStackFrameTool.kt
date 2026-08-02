@@ -84,7 +84,7 @@ class SelectStackFrameTool : AbstractMcpTool() {
             methodName = StackFrameUtils.extractMethodName(frame),
             isCurrent = true,
             isLibrary = StackFrameUtils.isLibraryPath(path),
-            presentation = frame.toString().take(100)
+            presentation = StackFrameUtils.formatPresentation(frame).take(100)
         )
     }
 }

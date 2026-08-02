@@ -105,7 +105,7 @@ class GetStackTraceTool : AbstractMcpTool() {
             methodName = StackFrameUtils.extractMethodName(frame),
             isCurrent = index == 0,
             isLibrary = StackFrameUtils.isLibraryPath(path),
-            presentation = frame.toString().take(150)
+            presentation = StackFrameUtils.formatPresentation(frame).take(150)
         )
     }
 }

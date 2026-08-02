@@ -4,8 +4,11 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp.runWithIdeModality
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.McpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.SetBreakpointTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.EvaluateTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.PauseTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.ResumeTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepOverTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.WaitForPauseTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.ListDebugSessionsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.StartDebugSessionTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.StopDebugSessionTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack.GetStackTraceTool
@@ -117,7 +120,7 @@ class LiveDebugSessionTest : JavaCodeInsightFixtureTestCase() {
         val psiFile = myFixture.addFileToProject("LiveDebugTarget.java", SOURCE)
         val sourcePath = psiFile.virtualFile.path
 
-        val port = launchDebuggee(compileDebuggee(sourcePath))
+        val port = launchDebuggee(compileDebuggee(sourcePath), "LiveDebugTarget")
         val configName = registerAttachConfiguration(port)
 
         // set_breakpoint before the session exists — it must be installed on attach.
@@ -194,6 +197,90 @@ class LiveDebugSessionTest : JavaCodeInsightFixtureTestCase() {
         }
     }
 
+    /**
+     * The pause/resume golden path against a genuinely *running* JVM — the one scenario live-IDE
+     * QA could not demonstrate, because real projects rarely have a config that stays up long
+     * enough to interrupt (QA report §5/§8.4). A deliberate spin debuggee has no such problem.
+     *
+     * `pausedReason` is deliberately not asserted here: a manual pause has no breakpoint at the
+     * pause site, so the documented file/line heuristic reports `step` — and the pause usually
+     * lands inside `Thread.sleep`, where there is no source position at all.
+     */
+    fun `test a running JVM can be paused resumed and paused again through the tools`() {
+        val spinSource = """
+            public class LiveSpinTarget {
+                public static void main(String[] args) throws Exception {
+                    long ticks = 0;
+                    while (true) {
+                        ticks++;
+                        Thread.sleep(10L);
+                    }
+                }
+            }
+        """.trimIndent()
+        val psiFile = myFixture.addFileToProject("LiveSpinTarget.java", spinSource)
+
+        val port = launchDebuggee(compileDebuggee(psiFile.virtualFile.path), "LiveSpinTarget")
+        val configName = registerAttachConfiguration(port)
+
+        structured(runTool(StartDebugSessionTool(), buildJsonObject {
+            put("configuration_name", configName)
+        }))
+
+        // Registration of an attached session is asynchronous; poll through the tool layer (the
+        // same machinery a client uses, and runTool pumps the EDT the registration needs).
+        val sessionId = awaitRunningSessionId()
+
+        // ── pause_execution suspends a free-running program ────────────────────────────
+        // No session_id on purpose: a running session that has never paused is not the IDE's
+        // "current" session, so this exercises resolveSession's only-session fallback — without
+        // it, this exact call answered "No active debug session" (live-QA §5).
+        val pause = structured(runTool(PauseTool(), buildJsonObject {}))
+        assertEquals("Pause must succeed: ${'$'}pause", "success", pause.str("status"))
+
+        val paused = structured(runTool(WaitForPauseTool(), buildJsonObject {
+            put("session_id", sessionId)
+            put("timeout", 30)
+        }))
+        assertEquals("Expected the session to report paused: ${'$'}paused", "paused", paused.str("waitResult"))
+        assertEquals("paused", paused.str("state"))
+
+        // ── resume_execution sets it running again ─────────────────────────────────────
+        val resume = structured(runTool(ResumeTool(), buildJsonObject { put("session_id", sessionId) }))
+        assertEquals("Resume must succeed: ${'$'}resume", "success", resume.str("status"))
+        waitUntil("the session to be free-running again") {
+            sessionState(sessionId) == "running"
+        }
+
+        // ── and the cycle is repeatable ────────────────────────────────────────────────
+        structured(runTool(PauseTool(), buildJsonObject { put("session_id", sessionId) }))
+        waitUntil("the second pause to land") {
+            sessionState(sessionId) == "paused"
+        }
+
+        structured(runTool(StopDebugSessionTool(), buildJsonObject { put("session_id", sessionId) }))
+        waitUntil("the debug session to leave XDebuggerManager") {
+            XDebuggerManager.getInstance(myFixture.project).debugSessions.isEmpty()
+        }
+    }
+
+    /** Polls `list_debug_sessions` until a session reports `running`, returning its id. */
+    private fun awaitRunningSessionId(timeoutMs: Long = 30_000): String {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val sessions = structured(runTool(ListDebugSessionsTool(), buildJsonObject {}))["sessions"]!!.jsonArray
+            val running = sessions.map { it.jsonObject }.firstOrNull { it.str("state") == "running" }
+            if (running != null) return running.str("id")
+            Thread.sleep(100)
+        }
+        throw AssertionError("Timed out after ${timeoutMs}ms waiting for a running debug session")
+    }
+
+    private fun sessionState(sessionId: String): String? {
+        val sessions = structured(runTool(ListDebugSessionsTool(), buildJsonObject {}))["sessions"]!!.jsonArray
+        return sessions.map { it.jsonObject }.firstOrNull { it.str("id") == sessionId }?.str("state")
+    }
+
     // ── Debuggee bootstrap ──────────────────────────────────────────────────────────────
 
     /**
@@ -227,13 +314,13 @@ class LiveDebugSessionTest : JavaCodeInsightFixtureTestCase() {
     }
 
     /** Starts the debuggee suspended and returns the JDWP port the agent announces. */
-    private fun launchDebuggee(classesDir: Path): Int {
+    private fun launchDebuggee(classesDir: Path, mainClass: String): Int {
         val javaBinary = jdkHome.resolve("bin/java")
         val process = ProcessBuilder(
             javaBinary.toString(),
             "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=127.0.0.1:0",
             "-cp", classesDir.toString(),
-            "LiveDebugTarget",
+            mainClass,
         ).redirectErrorStream(true).start()
         debuggee = process
 
@@ -253,7 +340,9 @@ class LiveDebugSessionTest : JavaCodeInsightFixtureTestCase() {
     }
 
     private fun registerAttachConfiguration(port: Int): String {
-        val configurationName = "live-debuggee"
+        // Unique per invocation: the heavy fixture can reuse one project across test methods, and
+        // a name collision would let start_debug_session resolve a stale config with a dead port.
+        val configurationName = "live-debuggee-$port"
         val type = ConfigurationTypeUtil.findConfigurationType(RemoteConfigurationType::class.java)
         val runManager = RunManager.getInstance(myFixture.project)
         val settings = runManager.createConfiguration(configurationName, type.configurationFactories.first())

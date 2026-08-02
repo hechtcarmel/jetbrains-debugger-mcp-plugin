@@ -106,11 +106,12 @@ class KtorMcpServer(
 
     fun stop() {
         try {
-            server?.stop(1000, 2000)
-            server = null
-            // Closing each transport cascades into the SDK deregistering its ServerSession.
-            // Dropping the maps alone would strand those sessions in the shared Server across
-            // every settings-driven restart.
+            // Close transports BEFORE stopping the engine, for two reasons: closing cascades into
+            // the SDK deregistering each ServerSession (dropping the maps alone would strand those
+            // sessions in the shared Server across every settings-driven restart), and doing it
+            // while the engine is alive lets live SSE streams and pending protocol awaits wind
+            // down gracefully — stopping the engine first cancels its whole job tree and anything
+            // still awaiting inside it surfaces as an async JobCancellationException error log.
             runBlocking {
                 withTimeoutOrNull(2_000) {
                     streamableTransports.values.forEach { runCatching { it.close() } }
@@ -119,6 +120,8 @@ class KtorMcpServer(
             }
             streamableTransports.clear()
             sseTransports.clear()
+            server?.stop(1000, 2000)
+            server = null
             LOG.info("MCP Server stopped")
         } catch (e: Exception) {
             LOG.warn("Error stopping MCP server", e)
