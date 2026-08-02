@@ -1,10 +1,6 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.contract
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandEntryExport
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ContentBlock
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolDefinition
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.BreakpointListResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.BreakpointHitInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.BreakpointInfo
@@ -77,11 +73,10 @@ class ResultShapeContractTest {
         const val MIN_PINNED_SHAPES = 25
 
         val PINNED_SHAPES: List<SerialDescriptor> = listOf(
-            // Protocol envelope — what every tools/call response is wrapped in.
-            serializer<ToolCallResult>().descriptor,
-            serializer<ContentBlock.Text>().descriptor,
-            serializer<ToolDefinition>().descriptor,
-            serializer<ToolAnnotations>().descriptor,
+            // The protocol envelope (CallToolResult, TextContent, Tool, ToolAnnotations) is no
+            // longer ours to pin — the MCP SDK owns those types, and pinning their internals here
+            // would only snapshot someone else's refactors. What this project actually depends on
+            // about them is asserted directly against the wire in McpSdkAssumptionsTest.
 
             // Breakpoints
             serializer<BreakpointInfo>().descriptor,

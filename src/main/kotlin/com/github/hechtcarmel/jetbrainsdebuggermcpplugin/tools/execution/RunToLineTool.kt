@@ -1,18 +1,17 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ExecutionControlResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.VirtualFileResolver
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.XDebuggerUtil
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -26,7 +25,7 @@ class RunToLineTool : AbstractMcpTool() {
         Use as a shortcut instead of setting a temporary breakpoint. Execution may stop earlier if another breakpoint is hit.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Run to Line")
+    override val annotations = ToolAnnotationPresets.mutable("Run to Line")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -35,15 +34,8 @@ class RunToLineTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("file_path") {
-                put("type", "string")
-                put("description", "Absolute path to the source file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources).")
-            }
-            putJsonObject("line") {
-                put("type", "integer")
-                put("description", "Target line number (1-based). Execution will pause when this line is about to execute. The line must be reachable from the current execution path.")
-                put("minimum", 1)
-            }
+            put("file_path", stringProperty("Absolute path to the source file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources)."))
+            put("line", integerProperty("Target line number (1-based). Execution will pause when this line is about to execute. The line must be reachable from the current execution path.", minimum = 1))
         }
         putJsonArray("required") {
             add(JsonPrimitive("file_path"))
@@ -52,22 +44,12 @@ class RunToLineTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val filePath = arguments["file_path"]?.jsonPrimitive?.content
-            ?: return createErrorResult("Missing required parameter: file_path")
-        val line = arguments["line"]?.jsonPrimitive?.intOrNull
-            ?: return createErrorResult("Missing required parameter: line")
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val filePath = ToolArguments.requireString(arguments, "file_path")
+        val line = ToolArguments.requireInt(arguments, "line", min = 1)
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to run to line")
-        }
+        val session = requirePausedSession(project, sessionId, "run to line")
 
         val virtualFile = VirtualFileResolver.resolve(filePath)
             ?: return createErrorResult(
@@ -81,7 +63,7 @@ class RunToLineTool : AbstractMcpTool() {
 
         return try {
             // runToPosition must be called from EDT
-            ApplicationManager.getApplication().invokeAndWait {
+            onEdt {
                 session.runToPosition(position, false)
             }
             createJsonResult(ExecutionControlResult(
@@ -91,6 +73,8 @@ class RunToLineTool : AbstractMcpTool() {
                 newState = "running",
                 message = "Running to $filePath:$line"
             ))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             createErrorResult("Failed to run to line: ${e.message}")
         }

@@ -1,10 +1,15 @@
 coverage:
   status:
+    # Project coverage stays informational: the headline number is dominated by Swing glue
+    # that has no headless fixture, and a project gate would demand a backfill campaign.
     project:
       default:
         informational: true
         threshold: 0%
         base: auto
+    # Patch coverage is enforcing: new and changed lines must be covered. This changes
+    # behaviour going forward without demanding a backfill.
     patch:
       default:
-        informational: true
+        informational: false
+        target: 70%

@@ -1,6 +1,5 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util
 
-import com.intellij.lang.LanguageUtil
 import com.intellij.openapi.fileTypes.LanguageFileType
 import com.intellij.openapi.vfs.VirtualFile
 
@@ -23,6 +22,8 @@ object LogMessageTransformer {
      * @param message The log message with {expression} placeholders
      * @param virtualFile The file where the breakpoint is set (used for language detection)
      * @return The transformed expression suitable for the target language
+     * @throws UnsupportedLogMessageException when the language has no evaluable string-formatting
+     *         syntax and the message is more than a single bare `{expression}`
      */
     fun transform(message: String, virtualFile: VirtualFile): String {
         if (!needsTransformation(message)) {

@@ -1,22 +1,22 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.variable
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.EvaluateExpressionSafetyGuard
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetVariableResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.EvaluatorUtils
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.FrameVariablesCollector
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.VariablePresentationUtils
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.frame.XStackFrame
 import com.intellij.xdebugger.frame.XValue
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -32,7 +32,7 @@ class SetVariableTool : AbstractMcpTool() {
         **Language limitations:** Native debuggers (LLDB/GDB) used for Rust, C++, and Go have limited support for modifying complex types like strings, collections, or heap-allocated values. Works best in languages with full debug support (Java, Kotlin, Python, JavaScript).
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Set Variable", destructive = true)
+    override val annotations = ToolAnnotationPresets.mutable("Set Variable", destructive = true)
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -41,14 +41,8 @@ class SetVariableTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("variable_name") {
-                put("type", "string")
-                put("description", "Name of the variable to modify")
-            }
-            putJsonObject("new_value") {
-                put("type", "string")
-                put("description", "New value as a string expression. For primitives: '42', '3.14', 'true'. For strings: '\"hello\"' (with quotes). For null: 'null'. Can also be an expression that evaluates to the target type.")
-            }
+            put("variable_name", stringProperty("Name of the variable to modify"))
+            put("new_value", stringProperty("New value as a string expression. For primitives: '42', '3.14', 'true'. For strings: '\"hello\"' (with quotes). For null: 'null'. Can also be an expression that evaluates to the target type."))
         }
         putJsonArray("required") {
             add(JsonPrimitive("variable_name"))
@@ -57,22 +51,12 @@ class SetVariableTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val variableName = arguments["variable_name"]?.jsonPrimitive?.content
-            ?: return createErrorResult("Missing required parameter: variable_name")
-        val newValue = arguments["new_value"]?.jsonPrimitive?.content
-            ?: return createErrorResult("Missing required parameter: new_value")
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val variableName = ToolArguments.requireString(arguments, "variable_name")
+        val newValue = ToolArguments.requireString(arguments, "new_value")
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to modify variables")
-        }
+        val session = requirePausedSession(project, sessionId, "modify variables")
 
         val currentFrame = session.currentStackFrame
             ?: return createErrorResult("No current stack frame")

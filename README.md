@@ -1,12 +1,13 @@
 # Debugger MCP Server
 
-![Build](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/workflows/Build/badge.svg)
+[![Build](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/actions/workflows/build.yml/badge.svg)](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/hechtcarmel/jetbrains-debugger-mcp-plugin/branch/main/graph/badge.svg)](https://codecov.io/gh/hechtcarmel/jetbrains-debugger-mcp-plugin)
 [![Version](https://img.shields.io/jetbrains/plugin/v/29233.svg)](https://plugins.jetbrains.com/plugin/29233)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/29233.svg)](https://plugins.jetbrains.com/plugin/29233)
 
 A JetBrains IDE plugin that exposes an **MCP (Model Context Protocol) server**, giving AI coding assistants full programmatic control over the debugger. Set breakpoints, step through code, inspect variables, and evaluate expressions—all driven autonomously by your AI assistant.
 
-**Fully tested**: IntelliJ IDEA, PyCharm, WebStorm, GoLand, RustRover, Android Studio, PhpStorm
+**Verified in CI** (IntelliJ Plugin Verifier): IntelliJ IDEA, PyCharm, WebStorm, GoLand. **Community-tested**: RustRover, Android Studio, PhpStorm
 **May work** (untested): RubyMine, CLion, DataGrip
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/hechtcarmel)
@@ -56,7 +57,7 @@ Unlike manual debugging, this plugin enables:
 - **Rich Context in Single Calls** - Get variables, stack, and source in one request
 - **Programmatic Breakpoint Control** - Set conditional breakpoints with complex expressions
 - **Cross-IDE Compatibility** - Works with any JetBrains IDE that supports XDebugger
-- **22 Comprehensive Tools** - Full debugging capability through MCP
+- **23 Comprehensive Tools** - Full debugging capability through MCP
 - **Configurable Server** - IDE-specific ports with customizable host binding
 
 Perfect for AI-assisted development workflows where you want your assistant to investigate bugs, validate fixes, or explore code behavior autonomously.
@@ -87,7 +88,7 @@ Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/29233) and in
 
 ### Manual Installation
 
-Download the [latest release](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/releases/latest) and install it manually:
+Download the latest version from the [JetBrains Marketplace versions page](https://plugins.jetbrains.com/plugin/29233/versions) and install it manually:
 <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
 
 ## Quick Start
@@ -263,6 +264,7 @@ The plugin provides **23 MCP tools** organized by category:
 | `step_into` | Step into method calls |
 | `step_out` | Step out of current method |
 | `run_to_line` | Continue execution until a specific line |
+| `wait_for_pause` | Block until the session pauses (breakpoint, step, manual) and return full status |
 
 ### Stack & Thread Tools
 
@@ -354,15 +356,34 @@ The plugin adds a "Debugger MCP Server" tool window (bottom panel) that shows:
 | -32602 | Invalid Params | Invalid or missing parameters |
 | -32603 | Internal Error | Unexpected internal error |
 
-### Custom MCP Errors
+### Tool Failures
 
-| Code | Name | Description |
-|------|------|-------------|
-| -32001 | Session Not Found | Debug session not found |
-| -32002 | File Not Found | Specified file does not exist |
-| -32003 | Not Paused | Operation requires paused session |
-| -32004 | Breakpoint Error | Failed to set/remove breakpoint |
-| -32005 | Evaluation Error | Expression evaluation failed |
+Tool failures are **not** JSON-RPC errors. A tool that fails returns a successful result whose
+payload carries `isError: true` and a human-readable message in `content[0].text`, so the model
+can read what went wrong and retry:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "Session must be paused to get variables" }],
+    "isError": true
+  }
+}
+```
+
+The JSON-RPC `error` channel is reserved for protocol-level problems — malformed JSON, an
+unparseable message, an unknown *method* (not an unknown tool).
+
+Project resolution is the one failure that returns structured JSON in `content[0].text`, because
+an agent that picked the wrong project needs the list of real ones to retry with:
+
+```json
+{ "error": "multiple_projects_open", "message": "...", "available_projects": [ ... ] }
+```
+
+`error` is one of `no_project_open`, `project_not_found` or `multiple_projects_open`.
 
 ## Settings
 
@@ -388,28 +409,34 @@ Custom regex rules are additional blocked patterns. They do not replace the buil
 
 ## Requirements
 
-- **JetBrains IDE** 2025.1 or later (any IDE based on IntelliJ Platform)
+- **JetBrains IDE** 2025.2 or later (any IDE based on IntelliJ Platform)
 - **JVM** 21 or later
-- **MCP Protocol** 2025-03-26 (Streamable HTTP, primary) with 2024-11-05 (SSE, legacy) fallback
+- **MCP Protocol** negotiated per client, from 2024-11-05 up to 2025-11-25, over the official MCP Kotlin SDK
 
 ### Supported IDEs
 
-**Fully tested**: IntelliJ IDEA, PyCharm, WebStorm, GoLand, RustRover, Android Studio, PhpStorm
+**Verified in CI** (IntelliJ Plugin Verifier): IntelliJ IDEA, PyCharm, WebStorm, GoLand. **Community-tested**: RustRover, Android Studio, PhpStorm
 **May work** (untested): RubyMine, CLion, DataGrip, Aqua, DataSpell, Rider
 
 ## Architecture
 
-The plugin runs an embedded Ktor CIO server on an IDE-specific port and supports **three MCP transports**:
+The plugin runs an embedded Ktor CIO server on an IDE-specific port and supports **three MCP transports**.
+The protocol itself — JSON-RPC framing, the `initialize` handshake, version negotiation, session
+lifecycle and batching — is handled by the official
+[MCP Kotlin SDK](https://github.com/modelcontextprotocol/kotlin-sdk); the plugin owns only the
+routes, the loopback-Origin guard, and the debugger tools themselves.
 
-### Streamable HTTP Transport (Primary, MCP 2025-03-26)
+### Streamable HTTP Transport (Primary)
 
 ```
 AI Assistant ──────► POST /debugger-mcp/streamable-http   (JSON-RPC with Mcp-Session-Id header)
                      ◄── JSON-RPC response                (immediate HTTP response)
+             ──────► GET /debugger-mcp/streamable-http    (server → client event stream)
+                     ◄── event: message                   (notifications, progress)
              ──────► DELETE /debugger-mcp/streamable-http  (session termination)
 ```
 
-### Legacy SSE Transport (MCP 2024-11-05)
+### Legacy HTTP+SSE Transport
 
 ```
 AI Assistant ──────► GET /debugger-mcp/sse           (establish SSE stream)
@@ -427,8 +454,9 @@ AI Assistant ──────► POST /debugger-mcp              (JSON-RPC req
 ```
 
 This approach:
-- **Modern clients** - Streamable HTTP with session management per MCP 2025-03-26 spec
-- **Legacy clients** - Full SSE transport per MCP 2024-11-05 spec
+- **Modern clients** - Streamable HTTP with session management and a server → client event stream
+- **Legacy clients** - Full HTTP+SSE transport for pre-2025 clients
+- **Protocol version** is negotiated per client, from `2024-11-05` up to `2025-11-25`
 - **Simple clients** - Stateless HTTP for quick request/response without sessions
 - Each IDE gets a unique default port to avoid conflicts when multiple IDEs run simultaneously
 - Works with any MCP-compatible client
@@ -436,7 +464,9 @@ This approach:
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the build/test quickstart
+and the project-specific tripwires (JDK 21, `pumpingEdt`, golden-contract regeneration). For
+security concerns, see [SECURITY.md](SECURITY.md). In short:
 
 1. Fork the repository
 2. Create a feature branch

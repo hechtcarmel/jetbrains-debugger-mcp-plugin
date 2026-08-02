@@ -1,11 +1,11 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.DebugSessionInfo
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.XDebugSession
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -25,7 +25,7 @@ class ListDebugSessionsTool : AbstractMcpTool() {
         Use to discover session IDs when multiple debug sessions are running, or to check which session is current.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.readOnly("List Debug Sessions")
+    override val annotations = ToolAnnotationPresets.readOnly("List Debug Sessions")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -37,7 +37,7 @@ class ListDebugSessionsTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
         val sessions = getAllSessions(project)
         val currentSession = getCurrentSession(project)
 

@@ -1,6 +1,8 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp.McpServerFactory
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp.McpToolBridge
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolRegistry
@@ -15,39 +17,33 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.options.ShowSettingsUtil
+import io.modelcontextprotocol.kotlin.sdk.server.Server
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Application-level service managing the MCP server infrastructure.
  *
- * This service manages:
- * - Embedded Ktor CIO server with configurable port
- * - Tool registry for MCP tools
- * - JSON-RPC handler for message processing
- * - SSE session management for client connections
- * - Coroutine scope for non-blocking tool execution
+ * Owns the [ToolRegistry], the MCP SDK [Server] built from it, and the embedded Ktor edge
+ * ([KtorMcpServer]) that exposes the SDK's transports on a configurable host and port.
  *
- * Uses HTTP+SSE transport for compatibility with MCP clients.
+ * Constructing the service does NOT bind a socket: the tool window may resolve the service on
+ * the EDT, and heavy work in a service constructor is forbidden. The server starts when
+ * [ensureStarted] is invoked from [com.github.hechtcarmel.jetbrainsdebuggermcpplugin.startup.McpServerStartupActivity].
+ *
+ * @param coroutineScope platform-injected service scope; the platform cancels it on plugin
+ *        unload, so no manual cancellation is needed in [dispose].
  */
 @Service(Service.Level.APP)
-class McpServerService : Disposable {
+class McpServerService(@Suppress("unused") private val coroutineScope: CoroutineScope) : Disposable {
 
     private val toolRegistry: ToolRegistry = ToolRegistry()
-    private val jsonRpcHandler: JsonRpcHandler
-    private val sseSessionManager: KtorSseSessionManager = KtorSseSessionManager()
-    private val streamableHttpSessionManager: StreamableHttpSessionManager = StreamableHttpSessionManager()
+    private val mcpServer: Server
     private var ktorServer: KtorMcpServer? = null
     private var serverError: ServerError? = null
-
-    /**
-     * Coroutine scope for non-blocking tool execution.
-     * Uses SupervisorJob so failures in one tool don't cancel others.
-     * Uses Default dispatcher for CPU-bound operations.
-     */
-    val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val startRequested = AtomicBoolean(false)
 
     /**
      * Represents a server error state.
@@ -64,17 +60,27 @@ class McpServerService : Disposable {
     }
 
     init {
-        LOG.info("Initializing MCP Server Service (Protocol: ${McpConstants.MCP_PROTOCOL_VERSION})")
-        jsonRpcHandler = JsonRpcHandler(toolRegistry)
+        LOG.info("Initializing MCP Server Service")
 
         // Register built-in tools
         toolRegistry.registerBuiltInTools()
+        mcpServer = McpServerFactory.create(toolRegistry, McpToolBridge())
 
-        // Start the Ktor server with configured port and host
-        val settings = McpSettings.getInstance()
-        startServer(settings.serverPort, settings.serverHost)
+        LOG.info("MCP Server Service initialized (server not yet started)")
+    }
 
-        LOG.info("MCP Server Service initialized with Ktor CIO server")
+    /**
+     * Starts the server on the configured host and port, exactly once per application session.
+     *
+     * Idempotent and thread-safe: with several projects opening concurrently, only the first
+     * caller binds the socket. An explicit [restartServer] (settings dialog) is unaffected by
+     * this guard.
+     */
+    fun ensureStarted() {
+        if (startRequested.compareAndSet(false, true)) {
+            val settings = McpSettings.getInstance()
+            startServer(settings.serverPort, settings.serverHost)
+        }
     }
 
     /**
@@ -92,10 +98,7 @@ class McpServerService : Disposable {
         val server = KtorMcpServer(
             port = port,
             host = host,
-            jsonRpcHandler = jsonRpcHandler,
-            sseSessionManager = sseSessionManager,
-            streamableHttpSessionManager = streamableHttpSessionManager,
-            coroutineScope = coroutineScope
+            mcpServer = mcpServer,
         )
 
         val result = when (val startResult = server.start()) {
@@ -165,16 +168,6 @@ class McpServerService : Disposable {
 
     fun getToolRegistry(): ToolRegistry = toolRegistry
 
-    fun getJsonRpcHandler(): JsonRpcHandler = jsonRpcHandler
-
-    fun getSseSessionManager(): KtorSseSessionManager = sseSessionManager
-
-    /**
-     * Returns the SSE endpoint URL for MCP connections.
-     * Clients should connect to this URL to establish SSE stream.
-     *
-     * @return The server URL, or null if server is not running
-     */
     /**
      * Returns the Streamable HTTP endpoint URL for MCP connections (primary transport).
      * Clients should use this URL for the MCP 2025-03-26 Streamable HTTP transport.
@@ -197,11 +190,6 @@ class McpServerService : Disposable {
         val settings = McpSettings.getInstance()
         return "http://${settings.serverHost}:${settings.serverPort}${McpConstants.SSE_ENDPOINT_PATH}"
     }
-
-    /**
-     * Returns the configured server port.
-     */
-    fun getServerPort(): Int = McpSettings.getInstance().serverPort
 
 
     /**
@@ -229,24 +217,15 @@ class McpServerService : Disposable {
     override fun dispose() {
         LOG.info("Disposing MCP Server Service")
         stopServer()
-        sseSessionManager.closeAllSessions()
-        streamableHttpSessionManager.closeAllSessions()
-        coroutineScope.cancel("McpServerService disposed")
+        // Close the SDK server too: stopping Ktor drops the sockets, but the SDK's ServerSessions
+        // and their coroutines are only released by close(). Leaving them is what turns "plugin
+        // can be unloaded without restart" into "restart required".
+        //
+        // dispose() can run on the EDT (plugin unload / app shutdown), where runBlocking is
+        // normally forbidden. It is tolerated here because the wait is hard-bounded at 2s by
+        // withTimeoutOrNull and is paid exactly once, at unload. The platform cancels the
+        // injected coroutineScope itself, so it is not cancelled here.
+        runBlocking { withTimeoutOrNull(2_000) { mcpServer.close() } }
     }
 }
 
-/**
- * Data class containing server status information.
- */
-data class ServerStatusInfo(
-    val name: String,
-    val version: String,
-    val protocolVersion: String,
-    val streamableHttpUrl: String,
-    val legacySseUrl: String,
-    val postUrl: String,
-    val port: Int,
-    val registeredTools: Int,
-    val error: String? = null,
-    val isRunning: Boolean = true
-)

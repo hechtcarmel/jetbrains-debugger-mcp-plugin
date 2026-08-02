@@ -162,7 +162,8 @@ If omitted with multiple projects, tools return an error listing available proje
 A failing tool returns a **successful** JSON-RPC result whose payload carries `isError: true` and
 a human-readable message in `content[0].text` — never a JSON-RPC `error` object. That is
 deliberate: the model can read the message and act on it, whereas a protocol error surfaces to the
-user as a hard transport failure.
+user as a hard transport failure. Since v5.0.0 this holds for an unknown tool name too, which the
+pre-SDK router reported as `-32601`.
 
 Most messages are free-form prose, and the exact strings are pinned by the test suite because they
 are the only failure signal a client gets. Representative examples:
@@ -229,9 +230,11 @@ it would cost more than it saves.
 
 | Layer | Location | What it protects |
 |-------|----------|------------------|
-| **Golden contracts** | `contract/` | The client-facing surface: 23 tool schemas, 31 result-model wire shapes |
+| **Golden contracts** | `contract/` | The client-facing surface: 23 tool schemas, 27 result-model wire shapes |
+| **SDK assumptions** | `mcp/McpSdkAssumptionsTest` | What this plugin relies on the MCP SDK doing — fails on an SDK bump, not a refactor |
 | **Transport conformance** | `server/transport/` | Every route, status code, header, Origin decision and SSE frame, over real HTTP |
 | **Tool behaviour** | `tools/**/*BehaviorTest` | What a tool actually does to IDE state |
+| **Live debuggee** | `livedebug/LiveDebugSessionTest` | The paused-state success paths against a real JVM: breakpoint hit, variables, evaluation, stepping, stack |
 | **Unit** | everything else | Pure logic — log-message transforms, safety analysis, value presentation |
 
 ### Golden contract files
@@ -242,8 +245,12 @@ it would cost more than it saves.
 - `result-shapes.txt` — every result model's wire keys, JSON kinds, nullability and optionality
 
 They are a **contract with MCP clients**. Result models use plain Kotlin property names as wire
-keys — there is exactly one `@SerialName` in `src/main` — so an IDE "Rename" on a result property
-is a source-compatible change that silently breaks every client. The snapshot is what catches it.
+keys, so an IDE "Rename" on a result property is a source-compatible change that silently breaks
+every client. The snapshot is what catches it.
+
+The protocol envelope itself (`CallToolResult`, `TextContent`, `Tool`, `ToolAnnotations`) is no
+longer pinned here — those types belong to the MCP SDK. What the plugin depends on about them is
+asserted against the wire in `McpSdkAssumptionsTest` instead.
 
 Changing them is sometimes correct, but must always be deliberate:
 
@@ -271,16 +278,23 @@ Write fixture files to disk under `project.basePath`, not via `myFixture.addFile
 
 Stated plainly so nobody mistakes the suite for more than it is:
 
-- **No live debug session.** Nothing starts a real debuggee, so the paused-state paths of
-  `get_variables`, `evaluate_expression`, `step_*`, `get_stack_trace` and `wait_for_pause` are
-  covered only for their error branches and their utility layers. The three breakpoint tools are
-  the only ones with real success-path behaviour coverage.
-- **`SessionStatusCollector` reports a degraded view**, and the tests pin that rather than the
-  documented ideal: `stackSummary` returns at most the current frame regardless of
-  `max_stack_frames`, `totalStackDepth` is 1 or 0, `currentThread` is hardcoded to `main`,
-  `threadCount` to 1, and `BreakpointHitInfo.hitCount` is always 0.
-- **Pause-reason detection is a file/line heuristic.** It returns only `breakpoint` or `step`,
-  never `exception` or `pause`, though the output schema advertises all four.
+- **One live debug session, one language, one scenario.** `livedebug/LiveDebugSessionTest`
+  compiles a small Java program, launches it suspended under JDWP, attaches through a `Remote`
+  run configuration started by `start_debug_session`, and drives the success paths of
+  `set_breakpoint`, `wait_for_pause` (including breakpoint attribution and the embedded
+  variables), `get_variables`, `evaluate_expression`, `step_over`, `get_stack_trace` and
+  `stop_debug_session` against the genuinely paused JVM. Still uncovered live: `step_into`,
+  `step_out`, `run_to_line`, `pause_execution`, `resume_execution`, `set_variable`,
+  `list_threads`, `select_stack_frame`, `get_debug_session_status`, conditional/log breakpoints
+  actually firing, and every non-Java debugger.
+- **`BreakpointHitInfo.hitCount` is always 0.** The language-agnostic `XBreakpoint` API exposes
+  no hit-count accessor; hit counts live in language-specific debugger implementations.
+- **Pause-reason detection is a file/line heuristic.** It matches the top frame's position against
+  enabled, unmuted line breakpoints, so it returns only `breakpoint` or `step`, never `exception`
+  or `pause`, though the output schema advertises all four.
+- **`additionalProperties: false` is gone from every input schema.** The MCP SDK's `ToolSchema`
+  cannot express it, so unknown arguments are no longer rejected. `McpSdkAssumptionsTest` fails if
+  a future SDK gains the ability, which is the signal to restore it.
 - **The evaluate-expression guard has known bypasses**, none of them fixed here: interpolated
   string templates (Kotlin `"${...}"`, JS backticks, Python f-strings) are blanked before scanning;
   an unbalanced quote blanks everything after it; only the first 10,000 characters are scanned; and

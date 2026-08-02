@@ -7,6 +7,11 @@ object LogExpressionFormatters {
 
     /**
      * Returns the appropriate formatter for the given language.
+     *
+     * Languages without a formatter get [UnsupportedLogExpressionFormatter] rather than a Java
+     * fallback: native debuggers (LLDB/GDB/Delve) cannot evaluate Java-style string concatenation,
+     * so the old fallback produced expressions that failed silently in the IDE console at hit time.
+     * Failing at `set_breakpoint` names the limitation while the agent can still react to it.
      */
     fun getFormatter(language: String): LogExpressionFormatter {
         return when (language.lowercase()) {
@@ -17,10 +22,16 @@ object LogExpressionFormatters {
             "ruby" -> RubyLogExpressionFormatter
             "php" -> PhpLogExpressionFormatter
             "c#" -> CSharpLogExpressionFormatter
-            else -> JavaLogExpressionFormatter // Default to Java-style
+            else -> UnsupportedLogExpressionFormatter(language)
         }
     }
 }
+
+/**
+ * Thrown when a log message uses `{expression}` placeholders for a language whose debugger cannot
+ * evaluate the string-building expression any formatter would emit.
+ */
+class UnsupportedLogMessageException(message: String) : IllegalArgumentException(message)
 
 /**
  * Interface for language-specific log expression formatters.
@@ -46,6 +57,12 @@ object JavaLogExpressionFormatter : LogExpressionFormatter {
         if (parts.isEmpty()) return "\"\""
 
         val segments = mutableListOf<String>()
+        // A leading expression followed by more parts would make Java's `+` left-associate over
+        // non-strings first: "{a}{b}" with two ints must print "34", not 7. An empty leading
+        // string literal forces concatenation from the first operand on.
+        if (parts.size > 1 && parts.first() is LogMessagePart.Expression) {
+            segments.add("\"\"")
+        }
         for (part in parts) {
             when (part) {
                 is LogMessagePart.Literal -> {
@@ -67,6 +84,32 @@ object JavaLogExpressionFormatter : LogExpressionFormatter {
             .replace("\r", "\\r")
             .replace("\t", "\\t")
     }
+}
+
+/**
+ * Fallback for languages debugged by native evaluators (Rust, Go, Swift, C, C++) and anything
+ * else without a formatter of its own.
+ *
+ * A single bare `{expr}` is passed through as the raw expression — every debugger can evaluate
+ * that. Anything needing string formatting is rejected: LLDB/GDB/Delve cannot reliably call
+ * `format!`/`fmt.Sprintf`, so emitting them would just trade one unevaluable expression for
+ * another that fails at breakpoint-hit time instead of now.
+ */
+class UnsupportedLogExpressionFormatter(private val language: String) : LogExpressionFormatter {
+
+    override fun format(parts: List<LogMessagePart>): String {
+        val single = parts.singleOrNull() as? LogMessagePart.Expression
+        if (single != null) {
+            return single.expression
+        }
+        throw UnsupportedLogMessageException(
+            "{expression} placeholders in log_message are not supported for $language: its debugger " +
+                "cannot evaluate the generated string-formatting expression. Use a single bare " +
+                "{expression} with no surrounding text, or pass a raw expression the debugger can evaluate."
+        )
+    }
+
+    override fun escapeLiteral(text: String): String = text
 }
 
 /**

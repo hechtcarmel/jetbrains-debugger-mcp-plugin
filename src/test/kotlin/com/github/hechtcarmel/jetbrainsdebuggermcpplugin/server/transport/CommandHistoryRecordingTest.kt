@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * ## Why this needs its own test
  *
- * The recording lives inside `JsonRpcHandler.processToolCall` — the tool layer knows nothing
+ * The recording lives inside `McpToolBridge` — the tool layer knows nothing
  * about it. When the MCP SDK migration deletes that handler, history recording disappears for
  * all 23 tools with **no compile error and no other failing test**: the tool window simply stays
  * empty forever and nobody notices until a user reports it.

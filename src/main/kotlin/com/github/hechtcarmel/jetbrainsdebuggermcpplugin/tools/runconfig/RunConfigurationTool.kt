@@ -1,21 +1,22 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.project.Project
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -34,7 +35,7 @@ class RunConfigurationTool : AbstractMcpTool() {
         Use when you need to run or debug a specific configuration. For debugging with full session tracking, prefer start_debug_session instead.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Execute Configuration")
+    override val annotations = ToolAnnotationPresets.mutable("Execute Configuration")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -61,10 +62,10 @@ class RunConfigurationTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val configName = arguments["name"]?.jsonPrimitive?.content
-            ?: return createErrorResult("Missing required parameter: name")
-        val mode = arguments["mode"]?.jsonPrimitive?.content ?: "debug"
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val configName = ToolArguments.requireString(arguments, "name")
+        // The historical "Invalid mode: ..." check below stays authoritative for unknown values.
+        val mode = ToolArguments.optionalString(arguments, "mode") ?: "debug"
 
         val runManager = RunManager.getInstance(project)
         val settings = runManager.allSettings.find { it.name == configName }
@@ -77,7 +78,7 @@ class RunConfigurationTool : AbstractMcpTool() {
         }
 
         return try {
-            withContext(Dispatchers.Main) {
+            withContext(Dispatchers.EDT) {
                 ProgramRunnerUtil.executeConfiguration(settings, executor)
             }
 
@@ -87,6 +88,8 @@ class RunConfigurationTool : AbstractMcpTool() {
                 status = "started",
                 message = "Started $configName in $mode mode"
             ))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             createErrorResult("Failed to start configuration: ${e.message}")
         }

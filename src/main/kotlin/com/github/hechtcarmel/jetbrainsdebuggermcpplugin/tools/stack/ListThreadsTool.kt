@@ -1,22 +1,18 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ThreadInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ThreadListResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ExecutionStackUtils
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.openapi.project.Project
-import com.intellij.xdebugger.frame.XExecutionStack
-import com.intellij.xdebugger.frame.XSuspendContext
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
-import kotlin.coroutines.resume
 
 class ListThreadsTool : AbstractMcpTool() {
 
@@ -27,7 +23,7 @@ class ListThreadsTool : AbstractMcpTool() {
         Use in multi-threaded applications to see which threads exist and which is currently selected.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.readOnly("List Threads")
+    override val annotations = ToolAnnotationPresets.readOnly("List Threads")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -41,26 +37,18 @@ class ListThreadsTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to list threads")
-        }
+        val session = requirePausedSession(project, sessionId, "list threads")
 
         val suspendContext = session.suspendContext
             ?: return createErrorResult("No suspend context available")
 
-        val threads = getThreads(suspendContext)
+        val threads = ExecutionStackUtils.collectExecutionStacks(suspendContext)
         val activeStack = suspendContext.activeExecutionStack
 
-        val threadInfos = threads.mapIndexed { index, stack ->
+        val threadInfos = threads.map { stack ->
             ThreadInfo(
                 id = stack.hashCode().toString(),
                 name = stack.displayName,
@@ -74,35 +62,5 @@ class ListThreadsTool : AbstractMcpTool() {
             threads = threadInfos,
             currentThreadId = activeStack?.hashCode()?.toString()
         ))
-    }
-
-    private suspend fun getThreads(suspendContext: XSuspendContext): List<XExecutionStack> {
-        return withTimeoutOrNull(3000L) {
-            suspendCancellableCoroutine { continuation ->
-                val stacks = mutableListOf<XExecutionStack>()
-
-                suspendContext.activeExecutionStack?.let { stacks.add(it) }
-
-                suspendContext.computeExecutionStacks(object : XSuspendContext.XExecutionStackContainer {
-                    override fun addExecutionStack(
-                        executionStacks: MutableList<out XExecutionStack>,
-                        last: Boolean
-                    ) {
-                        for (stack in executionStacks) {
-                            if (!stacks.any { it.hashCode() == stack.hashCode() }) {
-                                stacks.add(stack)
-                            }
-                        }
-                        if (last) {
-                            continuation.resume(stacks)
-                        }
-                    }
-
-                    override fun errorOccurred(errorMessage: String) {
-                        continuation.resume(stacks)
-                    }
-                })
-            }
-        } ?: listOfNotNull(suspendContext.activeExecutionStack)
     }
 }

@@ -7,6 +7,15 @@ on:
   release:
     types: [prereleased, released]
 
+# One release pipeline per tag; a re-run of the same tag queues instead of racing,
+# and releases for different tags never share the changelog branch concurrently.
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+# Least privilege: no default token scopes; the job declares exactly what it needs.
+permissions: {}
+
 jobs:
 
   # Prepare and publish the plugin to JetBrains Marketplace repository
@@ -20,7 +29,7 @@ jobs:
 
       # Free GitHub Actions Environment Disk Space
       - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v1.3.1
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
         with:
           tool-cache: false
           large-packages: false
@@ -31,6 +40,44 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
+      # The Marketplace channel is derived from the SemVer pre-release label, not from the
+      # GitHub pre-release flag. A stable version published from a GitHub pre-release would
+      # silently ship to the STABLE 'default' channel — refuse it.
+      - name: Assert release channel matches the pre-release flag
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          case "$VERSION" in
+            *-*) HAS_LABEL=true ;;
+            *)   HAS_LABEL=false ;;
+          esac
+          if [ "$IS_PRERELEASE" = "true" ] && [ "$HAS_LABEL" = "false" ]; then
+            echo "::error::GitHub release '$VERSION' is marked as a pre-release, but its version has no SemVer pre-release label, so it would publish to the STABLE 'default' Marketplace channel. Either publish it as a full release, or re-tag with a pre-release label (e.g. '$VERSION-rc.1')."
+            exit 1
+          fi
+          if [ "$IS_PRERELEASE" = "false" ] && [ "$HAS_LABEL" = "true" ]; then
+            echo "::warning::GitHub release '$VERSION' is a full release but carries a SemVer pre-release label; it will publish to a non-default Marketplace channel."
+          fi
+
+      # Refuse to go anywhere near publishPlugin without the full signing + publishing secret set.
+      # Without this, signPlugin silently onlyIf-skips and the UNSIGNED zip ships, green.
+      - name: Assert signing and publishing secrets are present
+        env:
+          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: |
+          missing=""
+          for v in CERTIFICATE_CHAIN PRIVATE_KEY PRIVATE_KEY_PASSWORD PUBLISH_TOKEN; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Refusing to publish - missing secrets:$missing"
+            exit 1
+          fi
+
       # Set up the Java environment for the next steps
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -40,7 +87,7 @@ jobs:
 
       # Setup Gradle
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
         with:
           cache-read-only: true
 
@@ -56,8 +103,18 @@ jobs:
 
           ./gradlew patchChangelog --release-note-file=$RELEASE_NOTE
 
+      # Produce the signed archive and verify its signature BEFORE publishing.
+      # This step failing means nothing reaches the Marketplace.
+      - name: Sign Plugin and Verify Signature
+        env:
+          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+        run: ./gradlew signPlugin verifyPluginSignature
+
       # Publish the plugin to JetBrains Marketplace
       - name: Publish Plugin
+        id: publish
         env:
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
@@ -65,18 +122,29 @@ jobs:
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
         run: ./gradlew publishPlugin
 
-      # Upload an artifact as a release asset
+      # Upload the signed archive — and only the signed archive — as a release asset.
+      # Guarded on the publish outcome so a failed publish never decorates the release,
+      # and --clobber makes a re-run idempotent.
       - name: Upload Release Asset
+        if: ${{ always() && steps.publish.outcome == 'success' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ github.event.release.tag_name }} ./build/distributions/*
+        run: gh release upload ${{ github.event.release.tag_name }} ./build/distributions/*-signed.zip --clobber
 
-      # Create a pull request
+      # Create a pull request with the patched changelog. Guarded on the publish outcome, and
+      # skipped cleanly when patchChangelog was a no-op (nothing to commit).
       - name: Create Pull Request
-        if: ${{ github.event.release.body != '' }}
+        if: ${{ always() && steps.publish.outcome == 'success' && github.event.release.body != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "CHANGELOG.md unchanged - nothing to open a pull request for."
+            exit 0
+          fi
+
           VERSION="${{ github.event.release.tag_name }}"
           BRANCH="changelog-update-$VERSION"
           LABEL="release changelog"

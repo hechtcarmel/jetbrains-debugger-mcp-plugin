@@ -33,12 +33,15 @@ class SafetyGuardCoverageTest {
         val TOOLS_DIR = File("src/main/kotlin/com/github/hechtcarmel/jetbrainsdebuggermcpplugin/tools")
 
         /**
-         * Tools that hand user-controlled text to an [com.intellij.xdebugger.evaluation.XDebuggerEvaluator]
-         * and must therefore consult the guard first.
+         * Tools that hand user-controlled text to the debugger for evaluation — either
+         * interactively via an [com.intellij.xdebugger.evaluation.XDebuggerEvaluator], or deferred
+         * via `XDebuggerUtil.createExpression` (breakpoint conditions and log expressions, which
+         * the debugger evaluates on every hit) — and must therefore consult the guard first.
          */
         val MUST_CONSULT_GUARD = setOf(
             "evaluation/EvaluateTool.kt",
             "variable/SetVariableTool.kt",
+            "breakpoint/SetBreakpointTool.kt",
         )
     }
 
@@ -71,17 +74,25 @@ class SafetyGuardCoverageTest {
      * Catches a *new* evaluator call site added without a guard call — the shape of the original
      * bug.
      *
-     * Every tool that evaluates user input does so through `EvaluatorUtils`, so its call sites are
-     * the complete set of places a payload can reach the debugger. `EvaluatorUtils` itself is the
-     * shared helper and is excluded: it never sees a safety mode, and guarding inside it would put
-     * the check below the layer that knows the source position.
+     * A payload reaches the debugger in one of two ways: interactively through `EvaluatorUtils`,
+     * or deferred through `XDebuggerUtil.createExpression` — the debugger later evaluates the
+     * stored expression itself (breakpoint conditions and log expressions), which is why grepping
+     * for `EvaluatorUtils.` alone was structurally blind to `SetBreakpointTool`. `EvaluatorUtils`
+     * itself is the shared helper and is excluded: it never sees a safety mode, and guarding
+     * inside it would put the check below the layer that knows the source position.
      */
     @Test
     fun `the set of tools that evaluate user input is exactly the guarded set`() {
+        // `\.\w` requires a member access, so prose like "Same pattern as EvaluatorUtils." in a
+        // comment does not count as an evaluator entry point.
+        val evaluatorCall = Regex("""EvaluatorUtils\.\w""")
         val evaluating = TOOLS_DIR.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
             .filterNot { it.name == "EvaluatorUtils.kt" }
-            .filter { it.readText().contains("EvaluatorUtils.") }
+            .filter {
+                val text = it.readText()
+                evaluatorCall.containsMatchIn(text) || text.contains("createExpression(")
+            }
             .map { it.relativeTo(TOOLS_DIR).path.replace(File.separatorChar, '/') }
             .sorted()
             .toSet()

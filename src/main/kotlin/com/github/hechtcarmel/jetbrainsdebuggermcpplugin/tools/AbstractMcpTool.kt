@@ -1,18 +1,13 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ContentBlock
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.StableObjectIds
 import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.editor.Document
-import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.TextRange
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebuggerManager
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -26,9 +21,9 @@ import kotlinx.serialization.json.put
  *
  * This class provides:
  * - Debugger access helpers ([getDebuggerManager], [getCurrentSession], [resolveSession])
- * - Thread-safe operations ([readAction], [writeAction], [suspendingWriteAction])
+ * - Precondition helpers that fail with the pinned error strings ([requireSession], [requirePausedSession])
+ * - Thread-safe operations ([readAction], [onEdt])
  * - Result creation ([createSuccessResult], [createErrorResult], [createJsonResult])
- * - Cancellation checking ([checkCanceled])
  *
  * ## Usage
  *
@@ -41,8 +36,8 @@ import kotlinx.serialization.json.put
  *     override val inputSchema = buildJsonObject { /* schema */ }
  *
  *     override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
- *         val session = resolveSession(project, arguments["session_id"]?.jsonPrimitive?.contentOrNull)
- *             ?: return createErrorResult("No active debug session")
+ *         val sessionId = ToolArguments.optionalString(arguments, "session_id")
+ *         val session = requirePausedSession(project, sessionId, "do my thing")
  *         // Tool logic here
  *         return createSuccessResult("Done")
  *     }
@@ -60,7 +55,7 @@ abstract class AbstractMcpTool : McpTool {
      *
      * Default is read-only and idempotent as a safe default.
      */
-    override val annotations: ToolAnnotations = ToolAnnotations.readOnly("Tool")
+    override val annotations: ToolAnnotations = ToolAnnotationPresets.readOnly("Tool")
 
     /**
      * JSON serializer configured for tool results.
@@ -164,12 +159,20 @@ abstract class AbstractMcpTool : McpTool {
     /**
      * Template method that delegates to tool-specific logic.
      *
+     * A [ToolExecutionError] thrown by the boundary helpers ([requireSession],
+     * [requirePausedSession], `ToolArguments`) is converted here into the standard
+     * `isError: true` result — its message is the complete client-facing error text.
+     *
      * @param project The IntelliJ project context
      * @param arguments The tool arguments as a JSON object
-     * @return A [ToolCallResult] containing the operation result or error
+     * @return A [CallToolResult] containing the operation result or error
      */
-    final override suspend fun execute(project: Project, arguments: JsonObject): ToolCallResult {
-        return doExecute(project, arguments)
+    final override suspend fun execute(project: Project, arguments: JsonObject): CallToolResult {
+        return try {
+            doExecute(project, arguments)
+        } catch (e: ToolExecutionError) {
+            createErrorResult(e.message)
+        }
     }
 
     /**
@@ -177,9 +180,9 @@ abstract class AbstractMcpTool : McpTool {
      *
      * @param project The IntelliJ project context
      * @param arguments The tool arguments as a JSON object matching [inputSchema]
-     * @return A [ToolCallResult] containing the operation result or error
+     * @return A [CallToolResult] containing the operation result or error
      */
-    protected abstract suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult
+    protected abstract suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult
 
     // ========== Debugger Access Helpers ==========
 
@@ -216,15 +219,16 @@ abstract class AbstractMcpTool : McpTool {
     /**
      * Finds a debug session by its ID.
      *
-     * Session IDs are the hash codes of the session objects.
+     * Session IDs are opaque strings minted by [StableObjectIds] — unique per live session, unlike
+     * the `hashCode()`-derived IDs they replaced, which could collide.
      *
      * @param project The project context
-     * @param sessionId The session ID (hash code as string)
+     * @param sessionId The session ID as returned by a previous tool call
      * @return The matching session, or null if not found
      */
     protected fun getSessionById(project: Project, sessionId: String): XDebugSession? {
         return getAllSessions(project).find {
-            it.hashCode().toString() == sessionId
+            StableObjectIds.idFor(it) == sessionId
         }
     }
 
@@ -246,71 +250,78 @@ abstract class AbstractMcpTool : McpTool {
     }
 
     /**
-     * Gets the session ID (hash code as string) for a session.
+     * Gets the opaque session ID for a session (see [StableObjectIds]).
      *
      * @param session The debug session
      * @return The session ID string
      */
     protected fun getSessionId(session: XDebugSession): String {
-        return session.hashCode().toString()
+        return StableObjectIds.idFor(session)
+    }
+
+    /**
+     * Resolves the session like [resolveSession], or fails with the pinned error strings:
+     * `Session not found: <id>` when an ID was given, otherwise [noSessionMessage]
+     * (default `No active debug session`).
+     *
+     * The thrown [ToolExecutionError] is converted to an `isError: true` result by [execute],
+     * which is what lets ~14 formerly hand-copied resolve-or-return preambles collapse to one
+     * expression without changing a single wire string.
+     */
+    protected fun requireSession(
+        project: Project,
+        sessionId: String?,
+        noSessionMessage: String = "No active debug session"
+    ): XDebugSession {
+        return resolveSession(project, sessionId)
+            ?: throw ToolExecutionError(
+                if (sessionId != null) "Session not found: $sessionId"
+                else noSessionMessage
+            )
+    }
+
+    /**
+     * Like [requireSession], and additionally fails with the pinned
+     * `Session must be paused to <verb>` when the session is not paused.
+     *
+     * @param verb the tool-specific phrase, e.g. `"step over"`, `"evaluate expressions"` —
+     *   each caller passes its historical wording verbatim, because the resulting strings are
+     *   the client contract
+     */
+    protected fun requirePausedSession(project: Project, sessionId: String?, verb: String): XDebugSession {
+        val session = requireSession(project, sessionId)
+        if (!session.isPaused) {
+            throw ToolExecutionError("Session must be paused to $verb")
+        }
+        return session
     }
 
     // ========== Thread Safety Helpers ==========
 
     /**
-     * Executes an action with a read lock (blocking version).
+     * Executes an action under the read lock, suspending instead of blocking.
+     *
+     * Delegates to the platform's cancellable [com.intellij.openapi.application.readAction],
+     * which yields to pending write actions instead of stalling the EDT behind a held lock.
      *
      * @param action The action to execute
      * @return The result of the action
      */
-    protected fun <T> readAction(action: () -> T): T {
-        return ReadAction.compute<T, Throwable>(action)
-    }
-
-    /**
-     * Checks if the current operation has been cancelled.
-     *
-     * Call this frequently in long-running loops to allow cancellation.
-     * Throws ProcessCanceledException if cancellation is requested.
-     */
-    protected fun checkCanceled() {
-        ProgressManager.checkCanceled()
-    }
-
-    /**
-     * Executes an action with a write lock (blocking version).
-     *
-     * @param project The project context
-     * @param commandName Name for the undo command
-     * @param action The action to execute
-     */
-    protected fun writeAction(project: Project, commandName: String, action: () -> Unit) {
-        WriteCommandAction.runWriteCommandAction(project, commandName, null, { action() })
-    }
-
-    /**
-     * Executes a write action using suspend function (non-blocking for caller).
-     *
-     * Runs the action on EDT with proper write locking.
-     *
-     * @param project The project context
-     * @param commandName Name for the undo command
-     * @param action The action to execute
-     */
-    protected suspend fun suspendingWriteAction(
-        project: Project,
-        commandName: String,
-        action: () -> Unit
-    ) {
-        withContext(Dispatchers.EDT) {
-            WriteCommandAction.runWriteCommandAction(project, commandName, null, { action() })
-        }
+    protected suspend fun <T> readAction(action: () -> T): T {
+        return com.intellij.openapi.application.readAction(action)
     }
 
     /**
      * Executes an action on the EDT (Event Dispatch Thread).
      *
      * Use this for UI operations or debugger operations that require EDT.
+     *
+     * This is the one sanctioned EDT hop for tools. Do NOT use
+     * `ApplicationManager.getApplication().invokeAndWait { }` in suspend code: it dispatches with
+     * `ModalityState.defaultModalityState()` and ignores the `ModalityState.any()` context element
+     * the server installs around every tool call, so the runnable queues behind any open modal
+     * dialog and the tool call hangs until the user closes it. `Dispatchers.EDT` reads the
+     * coroutine's modality context element and runs regardless of open dialogs.
      *
      * @param action The action to execute
      * @return The result of the action
@@ -321,47 +332,22 @@ abstract class AbstractMcpTool : McpTool {
         }
     }
 
-    // ========== File Resolution Helpers ==========
-
-    /**
-     * Converts an absolute file path to a project-relative path.
-     *
-     * @param project The project context
-     * @param virtualFile The file
-     * @return The relative path, or absolute path if not under project root
-     */
-    protected fun getRelativePath(project: Project, virtualFile: VirtualFile): String {
-        val basePath = project.basePath ?: return virtualFile.path
-        return virtualFile.path.removePrefix(basePath).removePrefix("/")
-    }
-
-    /**
-     * Gets the text content of a specific line from a document.
-     *
-     * @param document The document
-     * @param line 1-based line number
-     * @return The line text, or empty string if line is invalid
-     */
-    protected fun getLineText(document: Document, line: Int): String {
-        val lineIndex = line - 1
-        if (lineIndex < 0 || lineIndex >= document.lineCount) return ""
-
-        val startOffset = document.getLineStartOffset(lineIndex)
-        val endOffset = document.getLineEndOffset(lineIndex)
-        return document.getText(TextRange(startOffset, endOffset))
-    }
-
     // ========== Result Creation Helpers ==========
 
     /**
      * Creates a successful result with a text message.
      *
+     * `isError` is passed explicitly rather than left to default. [CallToolResult.isError] is
+     * `Boolean?` and the SDK serializer omits nulls, so an implicit default would drop the key
+     * from the wire entirely — a silent break for every client that branches on it.
+     * Pinned by `McpSdkAssumptionsTest`.
+     *
      * @param text The success message
-     * @return A [ToolCallResult] with `isError = false`
+     * @return A [CallToolResult] with `isError = false`
      */
-    protected fun createSuccessResult(text: String): ToolCallResult {
-        return ToolCallResult(
-            content = listOf(ContentBlock.Text(text = text)),
+    protected fun createSuccessResult(text: String): CallToolResult {
+        return CallToolResult(
+            content = listOf(TextContent(text)),
             isError = false
         )
     }
@@ -369,12 +355,15 @@ abstract class AbstractMcpTool : McpTool {
     /**
      * Creates an error result with a message.
      *
+     * Tool failures are reported as a *successful* MCP result carrying `isError = true`, never as a
+     * JSON-RPC error — the message is the only failure signal a model can read and act on.
+     *
      * @param message The error message
-     * @return A [ToolCallResult] with `isError = true`
+     * @return A [CallToolResult] with `isError = true`
      */
-    protected fun createErrorResult(message: String): ToolCallResult {
-        return ToolCallResult(
-            content = listOf(ContentBlock.Text(text = message)),
+    protected fun createErrorResult(message: String): CallToolResult {
+        return CallToolResult(
+            content = listOf(TextContent(message)),
             isError = true
         )
     }
@@ -382,18 +371,18 @@ abstract class AbstractMcpTool : McpTool {
     /**
      * Creates a successful result with JSON-serialized data.
      *
-     * When the data serializes to a JSON object, it is also included as
-     * `structuredContent` for MCP tools that define an `outputSchema`.
+     * When the data serializes to a JSON object it is also included as `structuredContent`, which
+     * is what MCP clients validate against a declared `outputSchema`.
      *
      * @param data The data to serialize (must be @Serializable)
-     * @return A [ToolCallResult] with JSON content, optional structuredContent, and `isError = false`
+     * @return A [CallToolResult] with JSON content, optional structuredContent, and `isError = false`
      */
-    protected inline fun <reified T> createJsonResult(data: T): ToolCallResult {
+    protected inline fun <reified T> createJsonResult(data: T): CallToolResult {
         val jsonText = json.encodeToString(data)
         val jsonElement = json.parseToJsonElement(jsonText)
         val structuredContent = jsonElement as? JsonObject
-        return ToolCallResult(
-            content = listOf(ContentBlock.Text(text = jsonText)),
+        return CallToolResult(
+            content = listOf(TextContent(jsonText)),
             isError = false,
             structuredContent = structuredContent
         )

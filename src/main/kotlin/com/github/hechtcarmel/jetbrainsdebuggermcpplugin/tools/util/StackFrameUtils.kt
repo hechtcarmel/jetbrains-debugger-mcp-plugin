@@ -5,6 +5,7 @@ import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
 /**
@@ -59,17 +60,24 @@ object StackFrameUtils {
 
                 executionStack.topFrame?.let { frames.add(it) }
 
+                // Frames arrive in batches (last=false ... last=true), so the resume condition
+                // can hold for more than one batch; resuming twice throws IllegalStateException
+                // on the debugger's own thread. Same pattern as EvaluatorUtils.
+                val resumed = AtomicBoolean(false)
+                continuation.invokeOnCancellation { resumed.set(true) }
+
                 executionStack.computeStackFrames(1, object : XExecutionStack.XStackFrameContainer {
                     override fun addStackFrames(stackFrames: MutableList<out XStackFrame>, last: Boolean) {
                         frames.addAll(stackFrames)
-                        if (last || frames.size > frameIndex) {
-                            val result = frames.getOrNull(frameIndex)
-                            continuation.resume(result)
+                        if ((last || frames.size > frameIndex) && resumed.compareAndSet(false, true)) {
+                            continuation.resume(frames.getOrNull(frameIndex))
                         }
                     }
 
                     override fun errorOccurred(errorMessage: String) {
-                        continuation.resume(frames.getOrNull(frameIndex))
+                        if (resumed.compareAndSet(false, true)) {
+                            continuation.resume(frames.getOrNull(frameIndex))
+                        }
                     }
                 })
             }
@@ -100,16 +108,24 @@ object StackFrameUtils {
             suspendCancellableCoroutine<List<XStackFrame>> { continuation ->
                 val collectedFrames = mutableListOf<XStackFrame>()
 
+                // Frames arrive in batches (last=false ... last=true), so the resume condition
+                // can hold for more than one batch; resuming twice throws IllegalStateException
+                // on the debugger's own thread. Same pattern as EvaluatorUtils.
+                val resumed = AtomicBoolean(false)
+                continuation.invokeOnCancellation { resumed.set(true) }
+
                 executionStack.computeStackFrames(1, object : XExecutionStack.XStackFrameContainer {
                     override fun addStackFrames(stackFrames: MutableList<out XStackFrame>, last: Boolean) {
                         collectedFrames.addAll(stackFrames)
-                        if (last || collectedFrames.size >= limit - 1) {
+                        if ((last || collectedFrames.size >= limit - 1) && resumed.compareAndSet(false, true)) {
                             continuation.resume(collectedFrames.take(limit - 1))
                         }
                     }
 
                     override fun errorOccurred(errorMessage: String) {
-                        continuation.resume(collectedFrames)
+                        if (resumed.compareAndSet(false, true)) {
+                            continuation.resume(collectedFrames.toList())
+                        }
                     }
                 })
             }

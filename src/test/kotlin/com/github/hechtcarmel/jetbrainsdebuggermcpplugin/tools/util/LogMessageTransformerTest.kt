@@ -132,6 +132,26 @@ class JavaLogExpressionFormatterTest {
         val parts = listOf(LogMessagePart.Expression("x"))
         assertEquals("(x)", formatter.format(parts))
     }
+
+    // Without the leading empty string, "{a}{b}" with two ints would emit (a) + (b) — integer
+    // addition printing 7 instead of "34". The seed forces string concatenation throughout.
+    @Test
+    fun `formats adjacent leading expressions as string concatenation not addition`() {
+        val parts = listOf(
+            LogMessagePart.Expression("a"),
+            LogMessagePart.Expression("b")
+        )
+        assertEquals("\"\" + (a) + (b)", formatter.format(parts))
+    }
+
+    @Test
+    fun `formats leading expression followed by literal as string concatenation`() {
+        val parts = listOf(
+            LogMessagePart.Expression("a"),
+            LogMessagePart.Literal(" done")
+        )
+        assertEquals("\"\" + (a) + \" done\"", formatter.format(parts))
+    }
 }
 
 class KotlinLogExpressionFormatterTest {
@@ -359,15 +379,67 @@ class LogExpressionFormattersTest {
         assertTrue(LogExpressionFormatters.getFormatter("ECMAScript 6") is JavaScriptLogExpressionFormatter)
     }
 
+    // The old Java fallback emitted `"x=" + (x)` for Rust/Go/Swift/C/C++, which LLDB/GDB/Delve
+    // reject at hit time — the agent got a convincing success and the failure surfaced only in
+    // the IDE console. Unknown languages now fail fast at set_breakpoint instead.
     @Test
-    fun `getFormatter returns Java formatter for unknown languages`() {
-        assertTrue(LogExpressionFormatters.getFormatter("unknown") is JavaLogExpressionFormatter)
-        assertTrue(LogExpressionFormatters.getFormatter("SomeNewLanguage") is JavaLogExpressionFormatter)
+    fun `getFormatter returns unsupported formatter for native and unknown languages`() {
+        listOf("Rust", "go", "Swift", "ObjectiveC", "unknown", "SomeNewLanguage").forEach { language ->
+            assertTrue(
+                "$language must not silently fall back to Java syntax",
+                LogExpressionFormatters.getFormatter(language) is UnsupportedLogExpressionFormatter
+            )
+        }
     }
 
     @Test
     fun `getFormatter returns Groovy and Scala as Java-style`() {
         assertTrue(LogExpressionFormatters.getFormatter("Groovy") is JavaLogExpressionFormatter)
         assertTrue(LogExpressionFormatters.getFormatter("Scala") is JavaLogExpressionFormatter)
+    }
+}
+
+class UnsupportedLogExpressionFormatterTest {
+
+    private val formatter = UnsupportedLogExpressionFormatter("Rust")
+
+    @Test
+    fun `a single bare expression passes through raw`() {
+        val parts = listOf(LogMessagePart.Expression("counter"))
+        assertEquals("counter", formatter.format(parts))
+    }
+
+    @Test
+    fun `a message with literal text is rejected naming the language and the workaround`() {
+        val parts = listOf(
+            LogMessagePart.Literal("x="),
+            LogMessagePart.Expression("x")
+        )
+
+        val error = try {
+            formatter.format(parts)
+            fail("Expected UnsupportedLogMessageException")
+            return
+        } catch (e: UnsupportedLogMessageException) {
+            e.message!!
+        }
+
+        assertTrue("Must name the language, was: $error", error.contains("Rust"))
+        assertTrue("Must point at the single-bare-expression workaround, was: $error", error.contains("single bare"))
+    }
+
+    @Test
+    fun `multiple expressions are rejected`() {
+        val parts = listOf(
+            LogMessagePart.Expression("a"),
+            LogMessagePart.Expression("b")
+        )
+
+        try {
+            formatter.format(parts)
+            fail("Expected UnsupportedLogMessageException")
+        } catch (_: UnsupportedLogMessageException) {
+            // expected
+        }
     }
 }

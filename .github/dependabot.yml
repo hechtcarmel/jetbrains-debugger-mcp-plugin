@@ -7,9 +7,20 @@ updates:
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per week for all patch + minor bumps; majors stay individual and reviewable.
+      gradle-minor-patch:
+        update-types: [ "minor", "patch" ]
+
   # Maintain dependencies for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # Actions bumps are low-risk and noisy — batch them all into a single weekly PR.
+      github-actions:
+        patterns: [ "*" ]

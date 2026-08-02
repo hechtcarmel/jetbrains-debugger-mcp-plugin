@@ -1,5 +1,6 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util
 
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
 import com.intellij.openapi.diagnostic.logger
 import java.io.File
 import java.io.OutputStream
@@ -20,8 +21,14 @@ object SkillInstaller {
 
     private const val SKILL_NAME = "jetbrains-debugger"
     private const val RESOURCE_BASE = "/skill/$SKILL_NAME"
+    private const val SKILL_MANIFEST = "SKILL.md"
 
-    private val SKILL_FILES = listOf(
+    /**
+     * Hand-maintained list of skill files, relative to [RESOURCE_BASE]. `SkillInstallerTest` pins
+     * it against the actual resource directory, so adding a resource without updating this list
+     * (or vice versa) fails the build instead of silently shipping a skill with dangling links.
+     */
+    internal val SKILL_FILES = listOf(
         "SKILL.md",
         "references/tool-reference.md"
     )
@@ -40,18 +47,13 @@ object SkillInstaller {
                 val targetFile = File(skillDir, relativePath)
                 targetFile.parentFile.mkdirs()
 
-                val resourcePath = "$RESOURCE_BASE/$relativePath"
-                val content = javaClass.getResourceAsStream(resourcePath)
+                val content = resourceBytes(relativePath)
                     ?: run {
-                        LOG.error("Skill resource not found: $resourcePath")
+                        LOG.error("Skill resource not found: $RESOURCE_BASE/$relativePath")
                         return null
                     }
 
-                content.use { input ->
-                    targetFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
+                targetFile.writeBytes(content)
             }
             LOG.info("Installed companion skill to ${skillDir.absolutePath}")
             skillDir
@@ -85,17 +87,39 @@ object SkillInstaller {
     private fun writeZipToStream(outputStream: OutputStream) {
         ZipOutputStream(outputStream).use { zos ->
             for (relativePath in SKILL_FILES) {
-                val resourcePath = "$RESOURCE_BASE/$relativePath"
-                val content = javaClass.getResourceAsStream(resourcePath)
-                    ?: throw IllegalStateException("Skill resource not found: $resourcePath")
+                val content = resourceBytes(relativePath)
+                    ?: throw IllegalStateException("Skill resource not found: $RESOURCE_BASE/$relativePath")
 
                 val entryName = "$SKILL_NAME/$relativePath"
                 zos.putNextEntry(ZipEntry(entryName))
-                content.use { input ->
-                    input.copyTo(zos)
-                }
+                zos.write(content)
                 zos.closeEntry()
             }
         }
+    }
+
+    /**
+     * Reads a bundled skill file, stamping the shipped plugin version into the SKILL.md
+     * frontmatter on the way out. The bundled resource itself carries no version, so without the
+     * stamp an installed copy has no staleness signal at all.
+     */
+    private fun resourceBytes(relativePath: String): ByteArray? {
+        val stream = javaClass.getResourceAsStream("$RESOURCE_BASE/$relativePath") ?: return null
+        val bytes = stream.use { it.readBytes() }
+        return if (relativePath == SKILL_MANIFEST) stampVersion(bytes) else bytes
+    }
+
+    private fun stampVersion(bytes: ByteArray): ByteArray {
+        val text = bytes.toString(Charsets.UTF_8)
+        if (!text.startsWith("---\n")) return bytes
+
+        val frontmatterEnd = text.indexOf("\n---", startIndex = 3)
+        if (frontmatterEnd < 0 || text.substring(0, frontmatterEnd).contains(Regex("(?m)^version:"))) {
+            return bytes
+        }
+
+        return text
+            .replaceFirst("---\n", "---\nversion: ${McpConstants.SERVER_VERSION}\n")
+            .toByteArray(Charsets.UTF_8)
     }
 }

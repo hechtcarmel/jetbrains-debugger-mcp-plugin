@@ -1,18 +1,17 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SelectFrameResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StackFrameInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.StackFrameUtils
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.frame.XStackFrame
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -26,7 +25,7 @@ class SelectStackFrameTool : AbstractMcpTool() {
         Use to inspect variables in a caller's scope. Frame 0 is the current function; higher indices are callers.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.idempotentMutable("Select Stack Frame")
+    override val annotations = ToolAnnotationPresets.idempotentMutable("Select Stack Frame")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -35,11 +34,7 @@ class SelectStackFrameTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("frame_index") {
-                put("type", "integer")
-                put("description", "Index of the stack frame to select (0 = topmost)")
-                put("minimum", 0)
-            }
+            put("frame_index", integerProperty("Index of the stack frame to select (0 = topmost)", minimum = 0))
         }
         putJsonArray("required") {
             add(JsonPrimitive("frame_index"))
@@ -47,20 +42,11 @@ class SelectStackFrameTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val frameIndex = arguments["frame_index"]?.jsonPrimitive?.intOrNull
-            ?: return createErrorResult("Missing required parameter: frame_index")
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val frameIndex = ToolArguments.requireInt(arguments, "frame_index", min = 0)
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to select stack frame")
-        }
+        val session = requirePausedSession(project, sessionId, "select stack frame")
 
         val suspendContext = session.suspendContext
             ?: return createErrorResult("No suspend context available")

@@ -2,7 +2,9 @@
 # https://www.jetbrains.com/help/qodana/qodana-yaml.html
 
 version: "1.0"
-linter: jetbrains/qodana-jvm-community:2024.3
+# Native mode tracking the qodana-action version. The previous `linter:` image pin
+# (jetbrains/qodana-jvm-community:2024.3) had skewed a full year behind the action.
+ide: QDJVMC
 projectJDK: "21"
 profile:
   name: qodana.recommended
@@ -10,3 +12,11 @@ exclude:
   - name: All
     paths:
       - .qodana
+# Backstop threshold, not a clean-baseline gate. Audited baseline (2026-08-01): 118 problems
+# (99 High, 19 Moderate) plus 20 Critical "sanity" issues caused by the Kotlin stdlib being
+# absent from the analysis classpath. Ratchet this number down as the backlog burns; the end
+# state (per the gates audit) is a narrow blocking profile over KotlinUnusedImport /
+# UnusedSymbol / RedundantSuspendModifier once analysis sanity is clean.
+failureConditions:
+  severityThresholds:
+    any: 150

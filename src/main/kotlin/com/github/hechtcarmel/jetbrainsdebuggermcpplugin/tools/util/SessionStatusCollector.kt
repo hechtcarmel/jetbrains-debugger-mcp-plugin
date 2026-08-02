@@ -7,7 +7,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebuggerManager
+import com.intellij.xdebugger.XSourcePosition
+import com.intellij.xdebugger.breakpoints.XBreakpointProperties
+import com.intellij.xdebugger.breakpoints.XBreakpointType
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
+import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import com.intellij.xdebugger.frame.XStackFrame
 
 object SessionStatusCollector {
@@ -23,8 +27,21 @@ object SessionStatusCollector {
         val currentFrame = session.currentStackFrame
         val isPaused = session.isPaused
 
+        val suspendContext = if (isPaused) session.suspendContext else null
+        val executionStack = suspendContext?.activeExecutionStack
+        val stackFrames = if (executionStack != null) {
+            StackFrameUtils.collectStackFrames(executionStack, maxStackFrames)
+        } else {
+            emptyList()
+        }
+        val threads = if (suspendContext != null) {
+            ExecutionStackUtils.collectExecutionStacks(suspendContext)
+        } else {
+            emptyList()
+        }
+
         return DebugSessionStatus(
-            sessionId = session.hashCode().toString(),
+            sessionId = StableObjectIds.idFor(session),
             name = session.sessionName,
             state = when {
                 session.isStopped -> "stopped"
@@ -32,45 +49,63 @@ object SessionStatusCollector {
                 else -> "running"
             },
             pausedReason = if (isPaused) determinePauseReason(session) else null,
-            currentLocation = currentFrame?.let { getSourceLocation(it) },
+            currentLocation = if (isPaused) currentFrame?.let { getSourceLocation(it) } else null,
             breakpointHit = if (isPaused) getBreakpointHitInfo(session) else null,
-            stackSummary = if (isPaused) getStackSummary(session, maxStackFrames) else emptyList(),
-            totalStackDepth = if (isPaused) getStackDepth(session) else 0,
+            stackSummary = buildStackSummary(stackFrames, currentFrame),
+            totalStackDepth = stackFrames.size,
             variables = if (isPaused && includeVariables) getVariables(currentFrame) else emptyList(),
             sourceContext = if (isPaused && includeSourceContext)
                 getSourceContext(project, currentFrame, sourceContextLines) else null,
-            currentThread = getCurrentThreadInfo(session),
-            threadCount = 1
+            currentThread = executionStack?.let { stack ->
+                ThreadInfo(
+                    id = stack.hashCode().toString(),
+                    name = stack.displayName,
+                    state = if (isPaused) "paused" else "running",
+                    isCurrent = true
+                )
+            },
+            threadCount = threads.size
         )
     }
 
     fun determinePauseReason(session: XDebugSession): String {
-        val position = session.currentStackFrame?.sourcePosition ?: return "step"
-        val breakpointManager = XDebuggerManager.getInstance(session.project).breakpointManager
-
-        val breakpoint = breakpointManager.allBreakpoints.filterIsInstance<XLineBreakpoint<*>>().find { bp ->
-            bp.fileUrl == position.file.url && bp.line == position.line
-        }
-
-        return if (breakpoint != null) "breakpoint" else "step"
+        val position = session.topFramePosition ?: return "step"
+        return if (findEnabledBreakpointAt(session, position) != null) "breakpoint" else "step"
     }
 
     fun getBreakpointHitInfo(session: XDebugSession): BreakpointHitInfo? {
-        val position = session.currentStackFrame?.sourcePosition ?: return null
-        val breakpointManager = XDebuggerManager.getInstance(session.project).breakpointManager
-
-        val breakpoint = breakpointManager.allBreakpoints.filterIsInstance<XLineBreakpoint<*>>().find { bp ->
-            bp.fileUrl == position.file.url && bp.line == position.line
-        } ?: return null
+        val position = session.topFramePosition ?: return null
+        val breakpoint = findEnabledBreakpointAt(session, position) ?: return null
 
         return BreakpointHitInfo(
-            breakpointId = breakpoint.hashCode().toString(),
+            breakpointId = StableObjectIds.idFor(breakpoint),
             type = "line",
             file = position.file.path,
             line = position.line + 1,
             condition = breakpoint.conditionExpression?.expression,
             hitCount = 0
         )
+    }
+
+    /**
+     * The breakpoint that can explain the current pause. The pause site is the *top* frame's
+     * position — select_stack_frame changes currentStackFrame, and the answer must not change
+     * with it. Muted or disabled breakpoints cannot have fired, so they never match.
+     */
+    private fun findEnabledBreakpointAt(session: XDebugSession, position: XSourcePosition): XLineBreakpoint<*>? {
+        if (session.areBreakpointsMuted()) return null
+        val breakpointManager = XDebuggerManager.getInstance(session.project).breakpointManager
+        return XBreakpointType.EXTENSION_POINT_NAME.extensionList
+            .filterIsInstance<XLineBreakpointType<*>>()
+            .flatMap { type ->
+                @Suppress("UNCHECKED_CAST")
+                breakpointManager.findBreakpointsAtLine(
+                    type as XLineBreakpointType<XBreakpointProperties<*>>,
+                    position.file,
+                    position.line
+                )
+            }
+            .firstOrNull { it.isEnabled }
     }
 
     suspend fun getVariables(frame: XStackFrame?): List<VariableInfo> {
@@ -83,47 +118,27 @@ object SessionStatusCollector {
         return SourceLocation(
             file = position.file.path,
             line = position.line + 1,
-            className = extractClassName(frame),
-            methodName = extractMethodName(frame),
+            className = StackFrameUtils.extractClassName(frame),
+            methodName = StackFrameUtils.extractMethodName(frame),
             signature = null
         )
     }
 
-    private fun extractClassName(frame: XStackFrame): String? {
-        val presentation = frame.toString()
-        val match = Regex("""([a-zA-Z_][\w.]*)\.[a-zA-Z_]\w*\(""").find(presentation)
-        return match?.groupValues?.get(1)
-    }
-
-    private fun extractMethodName(frame: XStackFrame): String? {
-        val presentation = frame.toString()
-        val match = Regex("""\.([a-zA-Z_]\w*)\(""").find(presentation)
-        return match?.groupValues?.get(1)
-    }
-
-    private fun getStackSummary(session: XDebugSession, maxFrames: Int): List<StackFrameInfo> {
-        val frames = mutableListOf<StackFrameInfo>()
-        val frame = session.currentStackFrame
-
-        if (frame != null) {
+    private fun buildStackSummary(frames: List<XStackFrame>, currentFrame: XStackFrame?): List<StackFrameInfo> {
+        return frames.mapIndexed { index, frame ->
             val position = frame.sourcePosition
-            frames.add(StackFrameInfo(
-                index = 0,
-                file = position?.file?.path,
+            val path = position?.file?.path
+            StackFrameInfo(
+                index = index,
+                file = path,
                 line = position?.let { it.line + 1 },
-                className = extractClassName(frame),
-                methodName = extractMethodName(frame),
-                isCurrent = true,
-                isLibrary = position?.file?.path?.contains(".jar!") == true,
+                className = StackFrameUtils.extractClassName(frame),
+                methodName = StackFrameUtils.extractMethodName(frame),
+                isCurrent = if (currentFrame != null) frame == currentFrame else index == 0,
+                isLibrary = StackFrameUtils.isLibraryPath(path),
                 presentation = frame.toString().take(100)
-            ))
+            )
         }
-
-        return frames
-    }
-
-    private fun getStackDepth(session: XDebugSession): Int {
-        return if (session.currentStackFrame != null) 1 else 0
     }
 
     private fun getSourceContext(
@@ -179,16 +194,6 @@ object SessionStatusCollector {
             currentLine = currentLine,
             lines = lines,
             breakpointsInView = breakpointsInView
-        )
-    }
-
-    private fun getCurrentThreadInfo(session: XDebugSession): ThreadInfo? {
-        session.suspendContext ?: return null
-        return ThreadInfo(
-            id = "main",
-            name = "main",
-            state = if (session.isPaused) "paused" else "running",
-            isCurrent = true
         )
     }
 }

@@ -1,21 +1,20 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.EvaluateResponse
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.EvaluationResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.EvaluatorUtils
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.StackFrameUtils
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.VariablePresentationUtils
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -35,7 +34,7 @@ class EvaluateTool : AbstractMcpTool() {
         **Language limitations:** Native debuggers (LLDB/GDB) used for Rust, C++, and Go have limited expression evaluation. Method calls (e.g., `s.len()`, `vec.size()`) may not work. Variable inspection works well. Full expression support is available in Java, Kotlin, Python, and JavaScript.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Evaluate Expression")
+    override val annotations = ToolAnnotationPresets.mutable("Evaluate Expression")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -44,16 +43,8 @@ class EvaluateTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("expression") {
-                put("type", "string")
-                put("description", "Expression to evaluate in the current context. Can be a variable name, method call, arithmetic, or complex expression. May be blocked by the IDE's Evaluate Expression safety mode. Examples: 'x', 'list.size()', 'a + b * 2', 'String.format(\"%d\", count)'")
-            }
-            putJsonObject("frame_index") {
-                put("type", "integer")
-                put("description", "Stack frame index for evaluation context (0 = current frame)")
-                put("default", 0)
-                put("minimum", 0)
-            }
+            put("expression", stringProperty("Expression to evaluate in the current context. Can be a variable name, method call, arithmetic, or complex expression. May be blocked by the IDE's Evaluate Expression safety mode. Examples: 'x', 'list.size()', 'a + b * 2', 'String.format(\"%d\", count)'"))
+            put("frame_index", integerProperty("Stack frame index for evaluation context (0 = current frame)", default = 0, minimum = 0))
         }
         putJsonArray("required") {
             add(JsonPrimitive("expression"))
@@ -61,21 +52,12 @@ class EvaluateTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val expression = arguments["expression"]?.jsonPrimitive?.content
-            ?: return createErrorResult("Missing required parameter: expression")
-        val frameIndex = arguments["frame_index"]?.jsonPrimitive?.intOrNull ?: 0
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val expression = ToolArguments.requireString(arguments, "expression")
+        val frameIndex = ToolArguments.optionalInt(arguments, "frame_index", default = 0, min = 0)
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to evaluate expressions")
-        }
+        val session = requirePausedSession(project, sessionId, "evaluate expressions")
 
         val frame = if (frameIndex == 0) {
             session.currentStackFrame

@@ -1,22 +1,12 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ExecutionControlResult
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.project.Project
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
+import com.intellij.xdebugger.XDebugSession
 
 /**
  * Steps over the current line (executes it without entering functions).
  */
-class StepOverTool : AbstractMcpTool() {
+class StepOverTool : AbstractExecutionControlTool() {
 
     override val name = "step_over"
 
@@ -25,47 +15,15 @@ class StepOverTool : AbstractMcpTool() {
         Use for line-by-line debugging when you don't need to inspect function internals. Check get_debug_session_status for the new location.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Step Over")
+    override val annotations = ToolAnnotationPresets.mutable("Step Over")
 
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            val (propName, propSchema) = projectPathProperty()
-            put(propName, propSchema)
-            val (sessionName, sessionSchema) = sessionIdProperty()
-            put(sessionName, sessionSchema)
-        }
-        put("required", buildJsonArray { })
-        put("additionalProperties", false)
-    }
+    override val action = "step_over"
+    override val successMessage = "Stepped over"
+    override val newState = "running" // Will pause again after step completes
+    override val failurePrefix = "Failed to step over"
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
+    override fun checkPauseState(session: XDebugSession): String? =
+        if (!session.isPaused) "Session must be paused to step over" else null
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to step over")
-        }
-
-        return try {
-            // stepOver must be called from EDT
-            ApplicationManager.getApplication().invokeAndWait {
-                session.stepOver(false)
-            }
-            createJsonResult(ExecutionControlResult(
-                sessionId = getSessionId(session),
-                action = "step_over",
-                status = "success",
-                message = "Stepped over",
-                newState = "running" // Will pause again after step completes
-            ))
-        } catch (e: Exception) {
-            createErrorResult("Failed to step over: ${e.message}")
-        }
-    }
+    override fun performAction(session: XDebugSession) = session.stepOver(false)
 }

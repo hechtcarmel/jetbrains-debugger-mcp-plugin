@@ -4,15 +4,49 @@
 
 ## [Unreleased]
 
+### Breaking
+- **Requires IntelliJ Platform 2025.2 or newer** (was 2025.1). The MCP SDK cannot be linked on 2025.1: it reaches `kotlin.time.Clock`, which that platform's bundled Kotlin standard library does not ship, and its Ktor version needs a coroutines API that 2025.1 does not have either.
+- **`initialize` now negotiates the protocol version** instead of reporting a fixed one per transport. A client that asks for `2024-11-05` is answered in `2024-11-05`; previously the streamable endpoint always claimed `2025-03-26` and the legacy endpoint always claimed `2024-11-05`, whatever the client requested.
+- **The server description moved from `serverInfo.description` to `instructions`.** `description` was never part of the MCP specification; `instructions` is where the spec carries this text.
+- **Calling an unknown tool now returns a normal result with `isError: true`** rather than a JSON-RPC protocol error, and the message no longer carries the doubled `Method not found: Tool not found:` prefix. This matches the error contract the plugin already documented, and unlike a transport error it is something a model can read and act on.
+- **`GET /debugger-mcp/streamable-http` now opens a server-to-client SSE stream** instead of returning `405`. This is what enables notifications, progress and cancellation.
+- **Input schemas no longer declare `additionalProperties: false`.** The MCP SDK's schema type cannot express it, so unrecognised arguments are no longer rejected by validating clients.
+- Malformed input is classified slightly differently: an empty body is `400` on every endpoint (the stateless endpoint previously answered `200`), a JSON object that is not a JSON-RPC message is a parse error (`-32700`) rather than an invalid request (`-32600`), an empty batch is accepted with nothing to answer rather than rejected, and batching `initialize` is no longer refused outright.
+- A request to the streamable endpoint without a session is still refused, but as `-32000 "Server not initialized"` rather than `-32600 "Missing Mcp-Session-Id header"`.
+- A notification is still answered `202`, but the body is now a JSON `null` literal rather than empty.
+- An `initialize` requesting a protocol version the server does not know is answered with the newest supported version (`2025-11-25`) instead of a fixed constant.
+- `Accept` and `Content-Type` remain advisory on the POST endpoints, as before: the SDK's strict header validation is relaxed at the edge so `curl`-style requests (wildcard `Accept`, implicit `Content-Type`) keep working.
+
+### Changed
+- **The hand-rolled MCP protocol layer has been replaced by the official [MCP Kotlin SDK](https://github.com/modelcontextprotocol/kotlin-sdk).** JSON-RPC framing, `initialize`, capability and version negotiation, `ping`, session lifecycle, batching and all three transports are now the SDK's. About 1,200 lines of protocol code were deleted. Endpoint URLs, the 23 tool names, parameters, descriptions and result shapes, and the `isError` error contract are unchanged (the one schema-level change is `additionalProperties`, above), so existing client configuration keeps working.
+- The plugin no longer bundles a Ktor HTTP *client*, which removes a latent `NoSuchMethodError` that shipped in previous releases.
+- Test suite rebuilt around golden contracts for the client-facing surface (23 tool schemas plus every result model's wire shape) and conformance tests that drive the real server over HTTP. Removed ~1,850 lines of tests that could not fail for any production reason, along with two dead source files (`util/JsonUtils.kt`, `util/ProjectUtils.kt`) that had no callers.
+- `CLAUDE.md` no longer documents the structured error codes `session_not_found`, `session_not_paused`, `breakpoint_not_found`, `invalid_location` and `evaluation_error`. No tool has ever emitted them; the real error contract is documented in their place, along with the suite's known gaps.
+
+### Added
+- **Breakpoint `condition` and `log_message` expressions now pass through the Evaluate Expression safety guard.** Previously they were handed to the debugger unchecked, so a blocked operation could be smuggled past Read-only mode as a breakpoint condition.
+- `wait_for_pause`, `get_debug_session_status`: `stackSummary` now honours `max_stack_frames` with real frames, `totalStackDepth` is the real reported depth, `currentThread` is the actual thread name (was hardcoded `main`), and `threadCount` is the real thread count (was hardcoded 1).
+- Tool arguments are validated at the boundary: a wrong type (`line: "42"`), an out-of-range value (`frame_index: -1`) or an unknown enum value (`suspend_policy: "banana"`) now returns a clear typed error instead of being silently coerced, defaulted, or surfacing a raw exception.
+- Tool-window actions are registered with the platform (visible in Find Action, bindable in the keymap) and a **Tools → Debugger MCP Server** menu was added. Status icons now have dark-theme variants.
+- `SECURITY.md` (honest threat model) and `CONTRIBUTING.md`.
+
 ### Fixed
+- **`set_breakpoint` uses the breakpoint-manager API directly** instead of a UI toggle plus a fixed 100 ms sleep. Setting the same line twice now updates the existing breakpoint instead of deleting it, concurrent calls are safe, the intermittent "Failed to create breakpoint" under load is gone, and the call is faster.
+- **Tool calls no longer hang while a modal dialog is open in the IDE.** Execution-control and breakpoint tools used `invokeAndWait` with the default modality, which queued behind any open dialog; `wait_for_pause`'s auto-resume had the same defect.
+- **Deep stack traces no longer break every stack operation**: the frame collector resumed its continuation once per debugger batch, throwing `Already resumed` on the debugger thread for any stack deep enough to arrive in two batches.
+- **`pausedReason` and `breakpointHit` are computed from the pause site**, not the currently selected frame — `select_stack_frame` no longer changes what breakpoint the status reports — and disabled or muted breakpoints are no longer reported as hit.
+- The Evaluate Expression safety guard **rejects** interpolated string templates (Kotlin `${'$'}{}`, JS backticks, Python f-strings, Ruby `#{}`), unterminated string literals and over-length expressions instead of blanking them — blanking let `"${'$'}{Runtime.getRuntime().exec(cmd)}"` pass the strictest mode.
+- `log_message` breakpoints in Rust/Go/Swift/C/C++ files are rejected with a clear error at `set_breakpoint` instead of silently storing Java-syntax expressions those debuggers cannot evaluate; multi-part Java log messages starting with an expression now concatenate as strings instead of adding integers.
+- Session and breakpoint ids are stable UUIDs instead of JVM `hashCode()` values, which could collide and make `remove_breakpoint` or `session_id` lookups ambiguous.
+- The MCP server binds its port when the IDE finishes starting up, not when anything first touches the service — opening the tool window or settings no longer starts the server as a side effect, and the "server started" notification appears once per IDE session instead of on every project open.
+- The version reported to MCP clients is read from the installed plugin descriptor at runtime, so it can never drift from the shipped version again.
+- The tool window releases its listeners when closed (it previously leaked the project through an unregistered disposable).
+
+### Fixed (pre-migration backlog)
 - `set_variable` now applies the Evaluate Expression safety mode to `new_value`. It previously evaluated the value as a code fragment without consulting the safety guard at all, so a blocked operation could be run by passing it as a variable value instead of an expression — bypassing Read-only mode and the risky-operation blocklist entirely.
 - `get_variables`, `get_debug_session_status` and `wait_for_pause` now declare every field they actually return in their output schemas. `wait_for_pause` and `get_debug_session_status` each omitted `breakpointHit`, `totalStackDepth`, `currentThread` and `threadCount`; `get_variables` omitted `scope`. MCP clients that validate `structuredContent` against the declared schema would reject those responses.
 - The tool window's **Refresh** button now works. It searched for the panel as the tool window's content component, but the content is a wrapper panel, so the button did nothing at all.
 - The server version reported to MCP clients during `initialize` was pinned at `4.0.0` while the plugin shipped 4.3.x. It now tracks the real plugin version, and a test keeps the two in sync.
-
-### Changed
-- Test suite rebuilt around golden contracts for the client-facing surface (23 tool schemas, 31 result-model wire shapes) and conformance tests that drive the real server over HTTP. Removed ~1,850 lines of tests that could not fail for any production reason, along with two dead source files (`util/JsonUtils.kt`, `util/ProjectUtils.kt`) that had no callers.
-- `CLAUDE.md` no longer documents the structured error codes `session_not_found`, `session_not_paused`, `breakpoint_not_found`, `invalid_location` and `evaluation_error`. No tool has ever emitted them; the real error contract is documented in their place, along with the suite's known gaps.
 
 ## [4.3.1]
 

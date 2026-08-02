@@ -1,6 +1,9 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.contract
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolRegistry
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.toSdkTool
+import io.modelcontextprotocol.kotlin.sdk.types.McpJson
+import io.modelcontextprotocol.kotlin.sdk.types.Tool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.Assert.assertEquals
@@ -128,13 +131,25 @@ class ToolManifestContractTest {
 
     @Test
     fun `every tool declares a non-blank description and an object input schema`() {
-        registry().getAllTools().forEach { tool ->
-            assertTrue("${tool.name} must have a description", tool.description.isNotBlank())
-            assertEquals(
-                "${tool.name} inputSchema must be an object schema",
-                "object",
-                tool.inputSchema["type"].toString().trim('"')
-            )
+        registry().getAllTools().map { it.toSdkTool() }.forEach { tool ->
+            assertTrue("${tool.name} must have a description", !tool.description.isNullOrBlank())
+            assertEquals("${tool.name} inputSchema must be an object schema", "object", tool.inputSchema.type)
+        }
+    }
+
+    /**
+     * The manifest renders name, description, annotations and the two schemas — and nothing else,
+     * because [toSdkTool] sets nothing else. If the mapper ever starts populating `title`, `icons`,
+     * `execution` or `_meta`, this fails, which is the instruction to add that field to
+     * [renderManifest] so the golden keeps describing the whole wire object.
+     */
+    @Test
+    fun `the mapper sets only the fields the manifest renders`() {
+        registry().getAllTools().map { it.toSdkTool() }.forEach { tool ->
+            assertEquals("${'$'}{tool.name}: title is not rendered by the manifest", null, tool.title)
+            assertEquals("${'$'}{tool.name}: icons are not rendered by the manifest", null, tool.icons)
+            assertEquals("${'$'}{tool.name}: execution is not rendered by the manifest", null, tool.execution)
+            assertEquals("${'$'}{tool.name}: meta is not rendered by the manifest", null, tool.meta)
         }
     }
 
@@ -143,26 +158,33 @@ class ToolManifestContractTest {
      *
      * Deliberately line-oriented rather than one JSON blob: a review diff then shows exactly
      * which tool and which schema line changed.
+     *
+     * Snapshots the **mapped SDK [Tool]**, not the schema each tool authors. Those two are no
+     * longer the same thing: `ToolSchema` can only carry `properties`, `required` and `$defs`, so
+     * anything else a tool writes — `additionalProperties: false`, for one — is dropped on the way
+     * to the wire. Rendering the authored schema would leave this file green while clients saw
+     * something different, which is the one failure mode a golden contract exists to prevent.
      */
     private fun renderManifest(): String {
-        val tools = registry().getAllTools().sortedBy { it.name }
+        val tools = registry().getAllTools().sortedBy { it.name }.map { it.toSdkTool() }
         return buildString {
             appendLine("# MCP tool manifest — golden snapshot")
+            appendLine("# Snapshot of the SDK Tool as serialized to clients, not of the authored schema.")
             appendLine("# Regenerate: ./gradlew test --tests \"*ToolManifestContractTest\" -Dcontract.update=true")
             appendLine("# tools: ${tools.size}")
             tools.forEach { tool ->
                 appendLine()
                 appendLine("## ${tool.name}")
                 appendLine("description:")
-                tool.description.trim().lines().forEach { appendLine("  $it") }
+                tool.description.orEmpty().trim().lines().forEach { appendLine("  $it") }
                 appendLine("annotations:")
                 appendLine(GoldenFile.canonicalJson(json.encodeToJsonElement(tool.annotations), indent = "  "))
                 appendLine("inputSchema:")
-                appendLine(GoldenFile.canonicalJson(tool.inputSchema, indent = "  "))
+                appendLine(GoldenFile.canonicalJson(McpJson.encodeToJsonElement(tool.inputSchema), indent = "  "))
                 appendLine("outputSchema:")
                 appendLine(
                     tool.outputSchema
-                        ?.let { GoldenFile.canonicalJson(it, indent = "  ") }
+                        ?.let { GoldenFile.canonicalJson(McpJson.encodeToJsonElement(it), indent = "  ") }
                         ?: "  <none>"
                 )
             }
