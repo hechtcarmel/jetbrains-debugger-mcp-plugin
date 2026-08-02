@@ -1,12 +1,13 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.BreakpointInfo
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.StableObjectIds
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.breakpoints.XBreakpoint
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -26,7 +27,7 @@ class ListBreakpointsTool : AbstractMcpTool() {
         Use to discover breakpoint IDs for removal, or to verify breakpoints are configured correctly before debugging.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.readOnly("List Breakpoints")
+    override val annotations = ToolAnnotationPresets.readOnly("List Breakpoints")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -38,7 +39,7 @@ class ListBreakpointsTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
         val breakpointManager = getDebuggerManager(project).breakpointManager
         val allBreakpoints = breakpointManager.allBreakpoints
 
@@ -58,7 +59,7 @@ class ListBreakpointsTool : AbstractMcpTool() {
         val lineBreakpoint = breakpoint as? XLineBreakpoint<*>
 
         return BreakpointInfo(
-            id = breakpoint.hashCode().toString(),
+            id = StableObjectIds.idFor(breakpoint),
             type = when {
                 isLineBreakpoint -> "line"
                 breakpoint.type.id.contains("exception", ignoreCase = true) -> "exception"

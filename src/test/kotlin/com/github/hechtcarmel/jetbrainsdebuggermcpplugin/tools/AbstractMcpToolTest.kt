@@ -1,9 +1,9 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ContentBlock
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.VariableInfo
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import com.intellij.openapi.project.Project
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -22,7 +22,7 @@ class AbstractMcpToolTest {
             put("type", "object")
         }
 
-        override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
+        override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
             return createSuccessResult("test")
         }
 
@@ -136,10 +136,10 @@ class AbstractMcpToolTest {
     fun `createSuccessResult creates non-error result with text content`() {
         val result = testTool.testCreateSuccessResult("Operation completed")
 
-        assertFalse(result.isError)
+        assertEquals(false, result.isError)
         assertEquals(1, result.content.size)
 
-        val content = result.content[0] as ContentBlock.Text
+        val content = result.content[0] as TextContent
         assertEquals("Operation completed", content.text)
     }
 
@@ -147,10 +147,10 @@ class AbstractMcpToolTest {
     fun `createErrorResult creates error result with text content`() {
         val result = testTool.testCreateErrorResult("Something went wrong")
 
-        assertTrue(result.isError)
+        assertEquals(true, result.isError)
         assertEquals(1, result.content.size)
 
-        val content = result.content[0] as ContentBlock.Text
+        val content = result.content[0] as TextContent
         assertEquals("Something went wrong", content.text)
     }
 
@@ -164,10 +164,10 @@ class AbstractMcpToolTest {
         )
         val result = testTool.testCreateJsonResultVariableInfo(data)
 
-        assertFalse(result.isError)
+        assertEquals(false, result.isError)
         assertEquals(1, result.content.size)
 
-        val content = result.content[0] as ContentBlock.Text
+        val content = result.content[0] as TextContent
         assertTrue(content.text.contains("\"name\":\"testVar\""))
         assertTrue(content.text.contains("\"value\":\"42\""))
         assertTrue(content.text.contains("\"type\":\"Int\""))
@@ -183,8 +183,8 @@ class AbstractMcpToolTest {
         )
         val result = testTool.testCreateJsonResultList(data)
 
-        assertFalse(result.isError)
-        val content = result.content[0] as ContentBlock.Text
+        assertEquals(false, result.isError)
+        val content = result.content[0] as TextContent
         assertTrue(content.text.startsWith("["))
         assertTrue(content.text.contains("\"var1\""))
         assertTrue(content.text.contains("\"var2\""))
@@ -201,7 +201,7 @@ class AbstractMcpToolTest {
         )
         val result = testTool.testCreateJsonResultVariableInfo(data)
 
-        assertFalse(result.isError)
+        assertEquals(false, result.isError)
         assertNotNull(result.structuredContent)
         assertEquals("testVar", result.structuredContent?.get("name")?.jsonPrimitive?.content)
         assertEquals("42", result.structuredContent?.get("value")?.jsonPrimitive?.content)

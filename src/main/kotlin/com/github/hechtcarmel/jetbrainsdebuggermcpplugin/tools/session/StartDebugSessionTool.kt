@@ -1,13 +1,16 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.DebugSessionInfo
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.project.Project
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -15,9 +18,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -34,17 +35,14 @@ class StartDebugSessionTool : AbstractMcpTool() {
         Use this to begin debugging. Call list_run_configurations first to discover available configurations.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Start Debug Session")
+    override val annotations = ToolAnnotationPresets.mutable("Start Debug Session")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
         putJsonObject("properties") {
             val (propName, propSchema) = projectPathProperty()
             put(propName, propSchema)
-            putJsonObject("configuration_name") {
-                put("type", "string")
-                put("description", "Name of the run configuration to debug")
-            }
+            put("configuration_name", stringProperty("Name of the run configuration to debug"))
         }
         putJsonArray("required") {
             add(JsonPrimitive("configuration_name"))
@@ -52,9 +50,8 @@ class StartDebugSessionTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val configName = arguments["configuration_name"]?.jsonPrimitive?.content
-            ?: return createErrorResult("Missing required parameter: configuration_name")
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val configName = ToolArguments.requireString(arguments, "configuration_name")
 
         val runManager = RunManager.getInstance(project)
         val settings = runManager.allSettings.find { it.name == configName }
@@ -65,7 +62,7 @@ class StartDebugSessionTool : AbstractMcpTool() {
         return try {
             val sessionCountBefore = getDebuggerManager(project).debugSessions.size
 
-            withContext(Dispatchers.Main) {
+            withContext(Dispatchers.EDT) {
                 ProgramRunnerUtil.executeConfiguration(settings, executor)
             }
 
@@ -104,6 +101,8 @@ class StartDebugSessionTool : AbstractMcpTool() {
                     session = null
                 ))
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             createErrorResult("Failed to start debug session: ${e.message}")
         }

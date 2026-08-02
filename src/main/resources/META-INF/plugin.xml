@@ -62,9 +62,9 @@ Set breakpoints, step through code, inspect variables, and evaluate expressionsâ
 <ul>
     <li><b>AI-Driven Debugging</b> - Let your AI assistant debug code autonomously</li>
     <li><b>Rich Context</b> - Single-call status provides variables, stack, and source context</li>
-    <li><b>Multi-IDE Support</b> - Fully tested on IntelliJ IDEA, PyCharm, WebStorm, GoLand, RustRover, Android Studio, PhpStorm</li>
+    <li><b>Multi-IDE Support</b> - CI-verified on IntelliJ IDEA, PyCharm, WebStorm and GoLand; community-tested on RustRover, Android Studio, PhpStorm</li>
     <li><b>Configurable Server</b> - IDE-specific ports with customizable host binding</li>
-    <li><b>Dual Transport</b> - Streamable HTTP (2025-03-26) primary, with legacy SSE fallback</li>
+    <li><b>Standards-based</b> - Official MCP Kotlin SDK; Streamable HTTP primary, legacy SSE fallback, protocol version negotiated per client</li>
 </ul>
 
 <h3>Supported AI Assistants</h3>
@@ -101,25 +101,16 @@ for detailed documentation and examples.</p>
     <!-- Optional Java debugger support -->
     <depends optional="true" config-file="java-debugger.xml">com.intellij.java</depends>
 
+    <!-- Services (McpServerService, McpSettings, CommandHistoryService) are registered solely
+         via the @Service annotation (light services); registering them here too would make the
+         annotation inert because the XML registration wins. -->
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Application-level service for MCP server -->
-        <applicationService
-            serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.McpServerService"/>
-
-        <!-- Application-level settings service -->
-        <applicationService
-            serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings"/>
-
         <!-- Settings configurable UI -->
         <applicationConfigurable
             parentId="tools"
             instance="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable"
             id="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable"
             displayName="Debugger MCP Server"/>
-
-        <!-- Project-level service for command history -->
-        <projectService
-            serviceImplementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandHistoryService"/>
 
         <!-- Startup Activity -->
         <postStartupActivity implementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.startup.McpServerStartupActivity"/>
@@ -135,11 +126,34 @@ for detailed documentation and examples.</p>
     </extensions>
 
     <actions>
-        <group id="DebuggerMcpServer.Actions" text="Debugger MCP Server">
+        <group id="DebuggerMcpServer.Actions" text="Debugger MCP Server" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
             <action id="DebuggerMcpServer.InstallSkill"
                     class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.InstallSkillAction"
                     text="Get Companion Skill"
                     description="Install or export the companion skill for AI coding agents"/>
+            <action id="DebuggerMcpServer.CopyClientConfig"
+                    class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.CopyClientConfigAction"
+                    text="Install on Coding Agents"
+                    description="Install MCP server on coding agents or copy configuration"/>
         </group>
+        <!-- Tool window toolbar actions: registered so they are visible to Find Action, the
+             keymap and ActionManager; the factory fetches them by id instead of new-ing them. -->
+        <action id="DebuggerMcpServer.Refresh"
+                class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.RefreshAction"
+                text="Refresh"
+                description="Refresh server status and history"/>
+        <action id="DebuggerMcpServer.CopyServerUrl"
+                class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.CopyServerUrlAction"
+                text="Copy URL"
+                description="Copy the MCP server URL to clipboard"/>
+        <action id="DebuggerMcpServer.ClearHistory"
+                class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.ClearHistoryAction"
+                text="Clear History"
+                description="Clear command history"/>
+        <action id="DebuggerMcpServer.ExportHistory"
+                class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.ExportHistoryAction"
+                text="Export History"
+                description="Export command history to file"/>
     </actions>
 </idea-plugin>

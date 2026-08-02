@@ -4,6 +4,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.CustomEvaluateExpressionBlockRule
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.EvaluateExpressionSafetyMode
 import com.intellij.openapi.components.PersistentStateComponent
+import com.intellij.openapi.components.RoamingType
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
@@ -13,7 +14,9 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 @Service(Service.Level.APP)
 @State(
     name = "com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings",
-    storages = [Storage("JetBrainsDebuggerMcpPlugin.xml")]
+    // Host and port are machine-specific; syncing them between machines via Settings Sync
+    // would replicate one machine's port conflicts onto every other machine.
+    storages = [Storage("JetBrainsDebuggerMcpPlugin.xml", roamingType = RoamingType.DISABLED)]
 )
 class McpSettings : PersistentStateComponent<McpSettings.State> {
 

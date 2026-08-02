@@ -13,11 +13,28 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.wm.ToolWindowManager
+import org.jetbrains.annotations.TestOnly
+import java.util.concurrent.atomic.AtomicBoolean
 
 class McpServerStartupActivity : ProjectActivity {
 
     companion object {
         private val LOG = logger<McpServerStartupActivity>()
+
+        /**
+         * The activity runs once per opened project, but the "Server started" balloon is
+         * application-scoped news: showing it again on every project open is pure noise.
+         * Guarded per application session (the flag resets with the plugin classloader).
+         */
+        private val serverStartedBalloonShown = AtomicBoolean(false)
+
+        fun shouldShowServerStartedBalloon(): Boolean =
+            serverStartedBalloonShown.compareAndSet(false, true)
+
+        @TestOnly
+        fun resetServerStartedBalloonForTests() {
+            serverStartedBalloonShown.set(false)
+        }
     }
 
     override suspend fun execute(project: Project) {
@@ -26,13 +43,17 @@ class McpServerStartupActivity : ProjectActivity {
         try {
             // Check for v2.0.0 migration
             val settings = McpSettings.getInstance()
-            if (settings.needsV2Migration()) {
+            val migrationNotificationShown = settings.needsV2Migration()
+            if (migrationNotificationShown) {
                 showMigrationNotification(project)
                 settings.markV2MigrationComplete()
             }
 
-            // Initialize the MCP server service (this triggers tool registration)
+            // Start the MCP server. The service constructor deliberately does not bind the
+            // socket (the tool window may construct the service on the EDT); this activity is
+            // the single place that requests the actual start.
             val mcpService = McpServerService.getInstance()
+            mcpService.ensureStarted()
             val serverUrl = mcpService.getServerUrl()
             val serverError = mcpService.getServerError()
 
@@ -43,8 +64,9 @@ class McpServerStartupActivity : ProjectActivity {
             } else if (serverUrl != null) {
                 LOG.info("MCP Server available at: $serverUrl")
 
-                // Show notification only for fresh installs (not migrations)
-                if (!settings.needsV2Migration()) {
+                // Show the balloon at most once per application session, and not on the
+                // project open that already showed the migration notification
+                if (!migrationNotificationShown && shouldShowServerStartedBalloon()) {
                     NotificationGroupManager.getInstance()
                         .getNotificationGroup(McpConstants.NOTIFICATION_GROUP_ID)
                         .createNotification(

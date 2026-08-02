@@ -5,6 +5,7 @@ import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
 /**
@@ -34,6 +35,27 @@ object StackFrameUtils {
     }
 
     /**
+     * Human-readable one-line summary of a frame, derived from the same source position the
+     * machine-readable fields use.
+     *
+     * The platform's `XStackFrame.toString()` encodes a 0-based line number, which reads as
+     * off-by-one next to the 1-based `line` field it shipped alongside (live-QA finding 4.1) —
+     * so it is used only as the fallback for frames with no source position, where there is no
+     * line to disagree with.
+     */
+    fun formatPresentation(frame: XStackFrame): String {
+        val position = frame.sourcePosition ?: return frame.toString()
+        val location = "${position.file.name}:${position.line + 1}"
+        val className = extractClassName(frame)?.substringAfterLast('.')
+        val methodName = extractMethodName(frame)
+        return if (className != null && methodName != null) {
+            "$className.$methodName($location)"
+        } else {
+            location
+        }
+    }
+
+    /**
      * Gets a stack frame at a specific index from a debug session.
      * Returns null if the frame is not found or timeout occurs.
      *
@@ -59,17 +81,24 @@ object StackFrameUtils {
 
                 executionStack.topFrame?.let { frames.add(it) }
 
+                // Frames arrive in batches (last=false ... last=true), so the resume condition
+                // can hold for more than one batch; resuming twice throws IllegalStateException
+                // on the debugger's own thread. Same pattern as EvaluatorUtils.
+                val resumed = AtomicBoolean(false)
+                continuation.invokeOnCancellation { resumed.set(true) }
+
                 executionStack.computeStackFrames(1, object : XExecutionStack.XStackFrameContainer {
                     override fun addStackFrames(stackFrames: MutableList<out XStackFrame>, last: Boolean) {
                         frames.addAll(stackFrames)
-                        if (last || frames.size > frameIndex) {
-                            val result = frames.getOrNull(frameIndex)
-                            continuation.resume(result)
+                        if ((last || frames.size > frameIndex) && resumed.compareAndSet(false, true)) {
+                            continuation.resume(frames.getOrNull(frameIndex))
                         }
                     }
 
                     override fun errorOccurred(errorMessage: String) {
-                        continuation.resume(frames.getOrNull(frameIndex))
+                        if (resumed.compareAndSet(false, true)) {
+                            continuation.resume(frames.getOrNull(frameIndex))
+                        }
                     }
                 })
             }
@@ -100,16 +129,24 @@ object StackFrameUtils {
             suspendCancellableCoroutine<List<XStackFrame>> { continuation ->
                 val collectedFrames = mutableListOf<XStackFrame>()
 
+                // Frames arrive in batches (last=false ... last=true), so the resume condition
+                // can hold for more than one batch; resuming twice throws IllegalStateException
+                // on the debugger's own thread. Same pattern as EvaluatorUtils.
+                val resumed = AtomicBoolean(false)
+                continuation.invokeOnCancellation { resumed.set(true) }
+
                 executionStack.computeStackFrames(1, object : XExecutionStack.XStackFrameContainer {
                     override fun addStackFrames(stackFrames: MutableList<out XStackFrame>, last: Boolean) {
                         collectedFrames.addAll(stackFrames)
-                        if (last || collectedFrames.size >= limit - 1) {
+                        if ((last || collectedFrames.size >= limit - 1) && resumed.compareAndSet(false, true)) {
                             continuation.resume(collectedFrames.take(limit - 1))
                         }
                     }
 
                     override fun errorOccurred(errorMessage: String) {
-                        continuation.resume(collectedFrames)
+                        if (resumed.compareAndSet(false, true)) {
+                            continuation.resume(collectedFrames.toList())
+                        }
                     }
                 })
             }

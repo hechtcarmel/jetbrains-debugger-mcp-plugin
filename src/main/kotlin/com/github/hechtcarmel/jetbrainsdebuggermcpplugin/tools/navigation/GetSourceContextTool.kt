@@ -1,20 +1,20 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.navigation
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SourceContext
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SourceLine
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.VirtualFileResolver
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
@@ -27,7 +27,7 @@ class GetSourceContextTool : AbstractMcpTool() {
         Use to see the code context without switching to the IDE. Shows line numbers and indicates which lines have breakpoints.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.readOnly("Get Source Context")
+    override val annotations = ToolAnnotationPresets.readOnly("Get Source Context")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -36,38 +36,21 @@ class GetSourceContextTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("file_path") {
-                put("type", "string")
-                put("description", "Absolute path to the source file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources). If not provided, uses current debug position.")
-            }
-            putJsonObject("line") {
-                put("type", "integer")
-                put("description", "Center line number (1-based). If not provided with file_path, uses current position.")
-                put("minimum", 1)
-            }
-            putJsonObject("lines_before") {
-                put("type", "integer")
-                put("description", "Number of source lines to include before the target line. Use larger values when you need more context to understand the code flow.")
-                put("default", 5)
-                put("minimum", 0)
-            }
-            putJsonObject("lines_after") {
-                put("type", "integer")
-                put("description", "Number of source lines to include after the target line. Use larger values to see more of the upcoming code.")
-                put("default", 5)
-                put("minimum", 0)
-            }
+            put("file_path", stringProperty("Absolute path to the source file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources). If not provided, uses current debug position."))
+            put("line", integerProperty("Center line number (1-based). If not provided with file_path, uses current position.", minimum = 1))
+            put("lines_before", integerProperty("Number of source lines to include before the target line. Use larger values when you need more context to understand the code flow.", default = 5, minimum = 0))
+            put("lines_after", integerProperty("Number of source lines to include after the target line. Use larger values to see more of the upcoming code.", default = 5, minimum = 0))
         }
         put("required", buildJsonArray { })
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val filePathArg = arguments["file_path"]?.jsonPrimitive?.content
-        val lineArg = arguments["line"]?.jsonPrimitive?.intOrNull
-        val linesBefore = arguments["lines_before"]?.jsonPrimitive?.intOrNull ?: 5
-        val linesAfter = arguments["lines_after"]?.jsonPrimitive?.intOrNull ?: 5
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val filePathArg = ToolArguments.optionalString(arguments, "file_path")
+        val lineArg = ToolArguments.optionalIntOrNull(arguments, "line", min = 1)
+        val linesBefore = ToolArguments.optionalInt(arguments, "lines_before", default = 5, min = 0)
+        val linesAfter = ToolArguments.optionalInt(arguments, "lines_after", default = 5, min = 0)
 
         val filePath: String
         val centerLine: Int
@@ -76,11 +59,10 @@ class GetSourceContextTool : AbstractMcpTool() {
             filePath = filePathArg
             centerLine = lineArg
         } else {
-            val session = resolveSession(project, sessionId)
-                ?: return createErrorResult(
-                    if (sessionId != null) "Session not found: $sessionId"
-                    else "No active debug session. Provide file_path and line instead."
-                )
+            val session = requireSession(
+                project, sessionId,
+                noSessionMessage = "No active debug session. Provide file_path and line instead."
+            )
 
             val currentFrame = session.currentStackFrame
                 ?: return createErrorResult("No current stack frame. Provide file_path and line instead.")
@@ -119,6 +101,10 @@ class GetSourceContextTool : AbstractMcpTool() {
                             isCurrent = lineNum == centerLine
                         )
                     } else null
+                } catch (e: CancellationException) {
+                    // Covers ProcessCanceledException: the suspending readAction cancels and
+                    // retries this lambda when a write action arrives — that must propagate.
+                    throw e
                 } catch (e: Exception) {
                     null
                 }

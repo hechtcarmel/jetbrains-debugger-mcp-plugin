@@ -1,14 +1,15 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StopSessionResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.openapi.project.Project
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
@@ -24,7 +25,7 @@ class StopDebugSessionTool : AbstractMcpTool() {
         Use to end a debugging session. This is a destructive operation that cannot be undone.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Stop Debug Session", destructive = true)
+    override val annotations = ToolAnnotationPresets.mutable("Stop Debug Session", destructive = true)
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -38,14 +39,10 @@ class StopDebugSessionTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
+        val session = requireSession(project, sessionId)
 
         val resolvedSessionId = getSessionId(session)
         val sessionName = session.sessionName
@@ -57,6 +54,8 @@ class StopDebugSessionTool : AbstractMcpTool() {
                 status = "stopped",
                 message = "Debug session '$sessionName' stopped"
             ))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             createErrorResult("Failed to stop session: ${e.message}")
         }

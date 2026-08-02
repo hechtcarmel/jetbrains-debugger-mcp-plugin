@@ -14,6 +14,7 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
@@ -241,10 +242,19 @@ class ServerStatusPanel(private val project: Project) : JBPanel<ServerStatusPane
 
     fun refresh() {
         try {
-            val mcpService = McpServerService.getInstance()
-            val error = mcpService.getServerError()
+            // serviceIfCreated: opening the tool window must never construct the service —
+            // startup drives the server lifecycle, the panel only reports on it.
+            val mcpService = ApplicationManager.getApplication().serviceIfCreated<McpServerService>()
+            val error = mcpService?.getServerError()
 
-            if (error != null) {
+            if (mcpService == null) {
+                // Service not created yet: the server cannot be running
+                statusLabel.text = "MCP Server Stopped"
+                statusLabel.foreground = JBColor.GRAY
+                urlLabel.text = ""
+                settingsLink.isVisible = true
+                projectLabel.text = ""
+            } else if (error != null) {
                 // Error state - show error message with settings link
                 statusLabel.text = "MCP Server Error"
                 statusLabel.foreground = JBColor.RED
@@ -369,7 +379,11 @@ class FilterToolbar(
     }
 
     private fun getToolNames(): Array<String> {
-        val toolNames = McpServerService.getInstance().getToolRegistry().getAllTools().map { it.name }
+        // serviceIfCreated so that opening the tool window never constructs the service;
+        // before startup finishes the filter simply offers "All".
+        val toolNames = ApplicationManager.getApplication().serviceIfCreated<McpServerService>()
+            ?.getToolRegistry()?.getAllTools()?.map { it.name }
+            .orEmpty()
         return (listOf("All") + toolNames).toTypedArray()
     }
 

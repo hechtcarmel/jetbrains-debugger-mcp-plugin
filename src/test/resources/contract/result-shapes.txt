@@ -5,7 +5,7 @@
 # change for every MCP client. 'optional' means the property has a Kotlin default;
 # production serializes with encodeDefaults=true, so optional fields are still
 # emitted. StreamableHttpTransportTest pins the bytes actually sent to a client.
-# shapes: 31
+# shapes: 27
 
 ## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandEntryExport
 kind: CLASS
@@ -18,28 +18,6 @@ kind: CLASS
   error: STRING [nullable]
   durationMs: LONG [nullable]
   affectedFiles: LIST [nullable]
-
-## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-kind: CLASS
-  title: STRING [nullable,optional]
-  readOnlyHint: BOOLEAN [nullable,optional]
-  destructiveHint: BOOLEAN [nullable,optional]
-  idempotentHint: BOOLEAN [nullable,optional]
-  openWorldHint: BOOLEAN [nullable,optional]
-
-## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
-kind: CLASS
-  content: LIST [required,non-null]
-  isError: BOOLEAN [optional]
-  structuredContent: MAP [nullable,optional]
-
-## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolDefinition
-kind: CLASS
-  name: STRING [required,non-null]
-  description: STRING [required,non-null]
-  inputSchema: MAP [required,non-null]
-  outputSchema: MAP [nullable,optional]
-  annotations: CLASS [nullable,optional]
 
 ## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.BreakpointListResult
 kind: CLASS
@@ -268,7 +246,3 @@ kind: CLASS
   sourceContext: CLASS [nullable,optional]
   currentThread: CLASS [nullable,optional]
   threadCount: INT [optional]
-
-## text
-kind: CLASS
-  text: STRING [required,non-null]

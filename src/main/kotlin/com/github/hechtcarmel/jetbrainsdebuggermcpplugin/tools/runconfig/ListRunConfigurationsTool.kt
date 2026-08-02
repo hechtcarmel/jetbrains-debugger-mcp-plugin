@@ -1,14 +1,15 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationListResult
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.openapi.project.Project
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -30,7 +31,7 @@ class ListRunConfigurationsTool : AbstractMcpTool() {
         Use this first to discover which configurations can be debugged before calling start_debug_session.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.readOnly("List Run Configurations")
+    override val annotations = ToolAnnotationPresets.readOnly("List Run Configurations")
 
     override val inputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -42,7 +43,7 @@ class ListRunConfigurationsTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
         val runManager = RunManager.getInstance(project)
         val allSettings = runManager.allSettings
         val selectedConfig = runManager.selectedConfiguration
@@ -80,6 +81,10 @@ class ListRunConfigurationsTool : AbstractMcpTool() {
                 settings.configuration
             )
             runner != null
+        } catch (e: CancellationException) {
+            // Covers ProcessCanceledException too (it extends CancellationException):
+            // a cancelled call must propagate, not degrade to can_run/can_debug = false.
+            throw e
         } catch (e: Exception) {
             false
         }

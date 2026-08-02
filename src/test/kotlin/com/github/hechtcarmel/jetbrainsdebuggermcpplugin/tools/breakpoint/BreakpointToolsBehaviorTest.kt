@@ -2,6 +2,8 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.transport.McpHttpTestCase
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettings
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.EvaluateExpressionSafetyMode
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.xdebugger.XDebuggerManager
@@ -57,8 +59,7 @@ class BreakpointToolsBehaviorTest : McpHttpTestCase() {
 
         // The light fixture reuses one project across every method in the class, and breakpoints
         // live on the project's XBreakpointManager. Clearing on the way IN as well as out makes
-        // each test independent of ordering — and of `set_breakpoint`'s trailing `delay(100)`,
-        // which can land a breakpoint after the previous test's teardown already snapshotted.
+        // each test independent of ordering.
         removeAllBreakpoints()
     }
 
@@ -222,6 +223,30 @@ class BreakpointToolsBehaviorTest : McpHttpTestCase() {
         assertEquals(emptyList<Any>(), listed)
     }
 
+    // ── Stable IDs ──────────────────────────────────────────────────────────────────────
+    //
+    // Breakpoint IDs are opaque strings minted per object by StableObjectIds (D8). What clients
+    // rely on is agreement: every tool must report the same ID for the same breakpoint, and
+    // re-setting a line that updates in place must not mint a new identity.
+
+    fun `test set_breakpoint and list_breakpoints agree on the breakpoint id`() {
+        val setId = payload(setBreakpoint(line = 5))["breakpointId"]!!.jsonPrimitive.content
+
+        val listedId = payload(callTool("list_breakpoints", "{}"))["breakpoints"]!!.jsonArray
+            .map { it.jsonObject }
+            .single { it["file"]?.jsonPrimitive?.content?.endsWith("Sample.java") == true }["id"]!!
+            .jsonPrimitive.content
+
+        assertEquals(setId, listedId)
+    }
+
+    fun `test re-setting the same line reports the same breakpoint id`() {
+        val first = payload(setBreakpoint(line = 5))["breakpointId"]!!.jsonPrimitive.content
+        val second = payload(setBreakpoint(line = 5))["breakpointId"]!!.jsonPrimitive.content
+
+        assertEquals("An in-place update must keep the breakpoint's identity", first, second)
+    }
+
     // ── Removal ─────────────────────────────────────────────────────────────────────────
 
     fun `test remove_breakpoint deletes it from the IDE`() {
@@ -237,6 +262,55 @@ class BreakpointToolsBehaviorTest : McpHttpTestCase() {
         val result = callTool("remove_breakpoint", """{"breakpoint_id":"not-a-real-id"}""")
 
         assertTrue(result["isError"]!!.jsonPrimitive.booleanOrNull!!)
+    }
+
+    // ── Safety guard ────────────────────────────────────────────────────────────────────
+    //
+    // Conditions and log expressions are evaluated by the debugger on every hit, unattended, so
+    // they consult the same safety guard as evaluate_expression. The mode setting is app-level
+    // and shared across tests in the fixture; always restore it.
+
+    private fun withSafetyMode(mode: EvaluateExpressionSafetyMode, block: () -> Unit) {
+        val settings = McpSettings.getInstance()
+        val previous = settings.evaluateExpressionSafetyMode
+        settings.evaluateExpressionSafetyMode = mode
+        try {
+            block()
+        } finally {
+            settings.evaluateExpressionSafetyMode = previous
+        }
+    }
+
+    fun `test a process execution condition is rejected under read-only mode`() {
+        withSafetyMode(EvaluateExpressionSafetyMode.READ_ONLY) {
+            val result = setBreakpoint(""","condition":"Runtime.getRuntime().exec(\"id\")"""")
+
+            assertTrue(result["isError"]!!.jsonPrimitive.booleanOrNull!!)
+            val message = result["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content
+            assertTrue("Should name the blocked construct, was: $message", message.contains("process execution"))
+            assertTrue("Should identify the condition as the culprit, was: $message", message.contains("condition"))
+            assertEquals("Nothing must be created on the rejection path", 0, lineBreakpoints().size)
+        }
+    }
+
+    fun `test a process execution log message placeholder is rejected under read-only mode`() {
+        withSafetyMode(EvaluateExpressionSafetyMode.READ_ONLY) {
+            val result = setBreakpoint(""","log_message":"pid={Runtime.getRuntime().exec(\"id\")}"""")
+
+            assertTrue(result["isError"]!!.jsonPrimitive.booleanOrNull!!)
+            val message = result["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content
+            assertTrue("Should name the blocked construct, was: $message", message.contains("process execution"))
+            assertTrue("Should identify the log_message as the culprit, was: $message", message.contains("log_message"))
+            assertEquals("Nothing must be created on the rejection path", 0, lineBreakpoints().size)
+        }
+    }
+
+    fun `test a benign condition still reaches the breakpoint under the default blocklist`() {
+        withSafetyMode(EvaluateExpressionSafetyMode.DEFAULT_BLOCKLIST) {
+            assertSucceeded(setBreakpoint(""","condition":"i == 7""""))
+
+            assertEquals("i == 7", lineBreakpoints().single().conditionExpression?.expression)
+        }
     }
 
     // ── Error paths ─────────────────────────────────────────────────────────────────────

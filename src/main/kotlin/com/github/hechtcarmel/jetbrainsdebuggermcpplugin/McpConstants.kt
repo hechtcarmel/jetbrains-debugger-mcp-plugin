@@ -1,10 +1,13 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.IdeProductInfo
+import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.util.messages.Topic
 
 object McpConstants {
     const val PLUGIN_NAME = "Debugger MCP Server"
+    const val PLUGIN_ID = "com.github.hechtcarmel.jetbrainsdebuggermcpplugin"
     const val TOOL_WINDOW_ID = PLUGIN_NAME
     const val NOTIFICATION_GROUP_ID = PLUGIN_NAME
     const val SETTINGS_DISPLAY_NAME = PLUGIN_NAME
@@ -19,11 +22,6 @@ object McpConstants {
     @JvmStatic
     fun getDefaultServerPort(): Int = IdeProductInfo.getDefaultPort()
 
-    /**
-     * Legacy constant for backwards compatibility.
-     * New code should use getDefaultServerPort() for IDE-specific ports.
-     */
-    const val DEFAULT_SERVER_PORT = 29190
 
     // MCP Endpoint paths
     const val MCP_ENDPOINT_PATH = "/debugger-mcp"
@@ -32,13 +30,7 @@ object McpConstants {
     const val SESSION_ID_PARAM = "sessionId"
     const val MCP_SESSION_ID_HEADER = "Mcp-Session-Id"
 
-    // JSON-RPC version
-    const val JSON_RPC_VERSION = "2.0"
 
-    // MCP Protocol versions
-    const val LEGACY_MCP_PROTOCOL_VERSION = "2024-11-05"
-    const val STREAMABLE_HTTP_MCP_PROTOCOL_VERSION = "2025-03-26"
-    const val MCP_PROTOCOL_VERSION = STREAMABLE_HTTP_MCP_PROTOCOL_VERSION
 
     // Server identification - IDE-specific
     /**
@@ -47,7 +39,25 @@ object McpConstants {
     @JvmStatic
     fun getServerName(): String = IdeProductInfo.getServerName()
 
-    const val SERVER_VERSION = "4.4.0"
+    /**
+     * Fallback for [SERVER_VERSION] used when the plugin descriptor is not loaded (plain unit
+     * tests). Must match `pluginVersion` in gradle.properties — `McpConstantsTest` pins that.
+     */
+    const val FALLBACK_SERVER_VERSION = "5.0.0"
+
+    /**
+     * The version reported to MCP clients during `initialize`.
+     *
+     * Read from the installed plugin descriptor at runtime, so it cannot drift from the version
+     * the plugin actually ships — the previous hardcoded constant drifted twice, once for four
+     * consecutive releases. The fallback only applies where the plugin is not loaded as a plugin
+     * (unit tests).
+     */
+    @JvmStatic
+    val SERVER_VERSION: String by lazy {
+        runCatching { PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))?.version }
+            .getOrNull() ?: FALLBACK_SERVER_VERSION
+    }
     const val SERVER_DESCRIPTION = """Debug applications running in JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.) through programmatic control.
 
 When to use: Use this server when you need to:

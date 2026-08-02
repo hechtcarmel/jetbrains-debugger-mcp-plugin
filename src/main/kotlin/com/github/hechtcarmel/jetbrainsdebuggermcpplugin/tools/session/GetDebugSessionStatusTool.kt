@@ -1,19 +1,17 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.putSessionStatusProperties
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.SessionStatusCollector
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.openapi.project.Project
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
@@ -31,7 +29,7 @@ class GetDebugSessionStatusTool : AbstractMcpTool() {
         This is the primary tool for understanding where execution stopped and why. Use after any execution control operation (resume, step, pause) to see the result.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.readOnly("Get Debug Status")
+    override val annotations = ToolAnnotationPresets.readOnly("Get Debug Status")
 
     override val outputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -39,80 +37,7 @@ class GetDebugSessionStatusTool : AbstractMcpTool() {
             putJsonObject("sessionId") { put("type", "string"); put("description", "Unique identifier for the debug session") }
             putJsonObject("name") { put("type", "string"); put("description", "Display name of the debug session") }
             putJsonObject("state") { put("type", "string"); put("description", "Current state: 'running', 'paused', or 'stopped'") }
-            putJsonObject("pausedReason") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) }; put("description", "Why execution paused: 'breakpoint', 'step', 'exception', or 'pause'") }
-            putJsonObject("currentLocation") {
-                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
-                putJsonObject("properties") {
-                    putJsonObject("file") { put("type", "string") }
-                    putJsonObject("line") { put("type", "integer") }
-                    putJsonObject("className") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    putJsonObject("methodName") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                }
-                put("description", "Current execution location")
-            }
-            putJsonObject("variables") {
-                put("type", "array")
-                putJsonObject("items") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("name") { put("type", "string") }
-                        putJsonObject("value") { put("type", "string") }
-                        putJsonObject("type") { put("type", "string") }
-                        putJsonObject("hasChildren") { put("type", "boolean") }
-                    }
-                }
-                put("description", "Variables visible in current stack frame")
-            }
-            putJsonObject("stackSummary") {
-                put("type", "array")
-                putJsonObject("items") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("index") { put("type", "integer") }
-                        putJsonObject("file") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                        putJsonObject("line") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
-                        putJsonObject("className") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                        putJsonObject("methodName") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    }
-                }
-                put("description", "Stack trace summary")
-            }
-            putJsonObject("sourceContext") {
-                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
-                put("description", "Source code around the current execution point")
-            }
-            putJsonObject("breakpointHit") {
-                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
-                putJsonObject("properties") {
-                    putJsonObject("breakpointId") { put("type", "string") }
-                    putJsonObject("type") { put("type", "string") }
-                    putJsonObject("file") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    putJsonObject("line") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
-                    putJsonObject("condition") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    putJsonObject("hitCount") { put("type", "integer") }
-                }
-                put("description", "The breakpoint at the current location, when the pause was caused by one")
-            }
-            putJsonObject("totalStackDepth") {
-                put("type", "integer")
-                put("description", "Number of frames reported in stackSummary")
-            }
-            putJsonObject("currentThread") {
-                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
-                putJsonObject("properties") {
-                    putJsonObject("id") { put("type", "string") }
-                    putJsonObject("name") { put("type", "string") }
-                    putJsonObject("state") { put("type", "string") }
-                    putJsonObject("isCurrent") { put("type", "boolean") }
-                    putJsonObject("group") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    putJsonObject("frameCount") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
-                }
-                put("description", "The thread the debugger is currently focused on")
-            }
-            putJsonObject("threadCount") {
-                put("type", "integer")
-                put("description", "Number of threads reported for the session")
-            }
+            putSessionStatusProperties()
         }
         put("required", buildJsonArray { add(JsonPrimitive("sessionId")); add(JsonPrimitive("name")); add(JsonPrimitive("state")) })
     }
@@ -124,47 +49,23 @@ class GetDebugSessionStatusTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("include_variables") {
-                put("type", "boolean")
-                put("description", "Include variables from current frame")
-                put("default", true)
-            }
-            putJsonObject("include_source_context") {
-                put("type", "boolean")
-                put("description", "Include source code around current line")
-                put("default", true)
-            }
-            putJsonObject("source_context_lines") {
-                put("type", "integer")
-                put("description", "Lines of context above/below current line")
-                put("default", 5)
-                put("minimum", 0)
-                put("maximum", 50)
-            }
-            putJsonObject("max_stack_frames") {
-                put("type", "integer")
-                put("description", "Maximum stack frames in summary")
-                put("default", 10)
-                put("minimum", 1)
-                put("maximum", 200)
-            }
+            put("include_variables", booleanProperty("Include variables from current frame", default = true))
+            put("include_source_context", booleanProperty("Include source code around current line", default = true))
+            put("source_context_lines", integerProperty("Lines of context above/below current line", default = 5, minimum = 0, maximum = 50))
+            put("max_stack_frames", integerProperty("Maximum stack frames in summary", default = 10, minimum = 1, maximum = 200))
         }
         put("required", buildJsonArray { })
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val includeVariables = arguments["include_variables"]?.jsonPrimitive?.booleanOrNull ?: true
-        val includeSourceContext = arguments["include_source_context"]?.jsonPrimitive?.booleanOrNull ?: true
-        val sourceContextLines = arguments["source_context_lines"]?.jsonPrimitive?.intOrNull ?: 5
-        val maxStackFrames = arguments["max_stack_frames"]?.jsonPrimitive?.intOrNull ?: 10
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val includeVariables = ToolArguments.optionalBoolean(arguments, "include_variables", default = true)
+        val includeSourceContext = ToolArguments.optionalBoolean(arguments, "include_source_context", default = true)
+        val sourceContextLines = ToolArguments.optionalInt(arguments, "source_context_lines", default = 5, min = 0, max = 50)
+        val maxStackFrames = ToolArguments.optionalInt(arguments, "max_stack_frames", default = 10, min = 1, max = 200)
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
+        val session = requireSession(project, sessionId)
 
         val status = SessionStatusCollector.collectStatus(
             project = project,

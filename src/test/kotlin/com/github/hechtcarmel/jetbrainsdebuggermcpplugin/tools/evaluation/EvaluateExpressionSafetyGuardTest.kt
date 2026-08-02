@@ -225,4 +225,124 @@ class EvaluateExpressionSafetyGuardTest {
         assertNotNull(violation)
         assertEquals("custom-regex", violation?.ruleId)
     }
+
+    // ── Rejection instead of blanking ───────────────────────────────────────────────────
+    //
+    // The guard used to blank string-literal contents before scanning. Interpolated segments are
+    // *code* in Kotlin/JS/Python/Ruby, so blanking removed the payload AND every token the
+    // blocklist and read-only rules look for: "${Runtime.getRuntime().exec(cmd)}" scanned as an
+    // inert literal and passed even READ_ONLY — the strictest mode. These constructs are now
+    // rejected outright; the tests below pin the rejection as a security property.
+
+    @Test
+    fun `kotlin string template payload is rejected in every non-unrestricted mode`() {
+        val payload = "\"\${Runtime.getRuntime().exec(cmd)}\""
+
+        EvaluateExpressionSafetyMode.entries
+            .filter { it != EvaluateExpressionSafetyMode.UNRESTRICTED }
+            .forEach { mode ->
+                val violation = EvaluateExpressionSafetyGuard.validate(payload, mode, context = null)
+                assertNotNull("$mode must reject an interpolated template rather than blank it", violation)
+                assertEquals("interpolated-string-template", violation?.ruleId)
+            }
+    }
+
+    @Test
+    fun `ruby style interpolation is rejected`() {
+        val violation = EvaluateExpressionSafetyGuard.validate(
+            expression = "\"pid=#{`id`}\"",
+            mode = EvaluateExpressionSafetyMode.DEFAULT_BLOCKLIST,
+            context = null
+        )
+
+        assertNotNull(violation)
+        assertEquals("interpolated-string-template", violation?.ruleId)
+    }
+
+    @Test
+    fun `javascript backtick template is rejected`() {
+        val violation = EvaluateExpressionSafetyGuard.validate(
+            expression = "`\${require('child_process').execSync('id')}`",
+            mode = EvaluateExpressionSafetyMode.DEFAULT_BLOCKLIST,
+            context = null
+        )
+
+        assertNotNull(violation)
+        assertEquals("interpolated-string-template", violation?.ruleId)
+    }
+
+    @Test
+    fun `ruby backtick shell execution is rejected`() {
+        val violation = EvaluateExpressionSafetyGuard.validate(
+            expression = "`id`",
+            mode = EvaluateExpressionSafetyMode.READ_ONLY,
+            context = null
+        )
+
+        assertNotNull(violation)
+        assertEquals("interpolated-string-template", violation?.ruleId)
+    }
+
+    @Test
+    fun `python f-string payload is rejected`() {
+        val violation = EvaluateExpressionSafetyGuard.validate(
+            expression = "f\"{__import__('os').system('id')}\"",
+            mode = EvaluateExpressionSafetyMode.DEFAULT_BLOCKLIST,
+            context = null
+        )
+
+        assertNotNull(violation)
+        assertEquals("interpolated-string-template", violation?.ruleId)
+    }
+
+    // An unbalanced quote used to blank everything after it, hiding any payload in the remainder.
+    @Test
+    fun `unterminated string literal is rejected rather than blanking the remainder`() {
+        val violation = EvaluateExpressionSafetyGuard.validate(
+            expression = """label + " + Runtime.getRuntime().exec(cmd)""",
+            mode = EvaluateExpressionSafetyMode.DEFAULT_BLOCKLIST,
+            context = null
+        )
+
+        assertNotNull(violation)
+        assertEquals("unterminated-string-literal", violation?.ruleId)
+    }
+
+    // The scan used to truncate at 10k chars, so a long no-op prefix pushed the payload out of
+    // the analyzed window and disabled the guard entirely.
+    @Test
+    fun `expression over the scan cap is rejected rather than truncated`() {
+        val payload = " ".repeat(10_001) + """Runtime.getRuntime().exec("id")"""
+
+        val violation = EvaluateExpressionSafetyGuard.validate(
+            expression = payload,
+            mode = EvaluateExpressionSafetyMode.DEFAULT_BLOCKLIST,
+            context = null
+        )
+
+        assertNotNull(violation)
+        assertEquals("expression-too-long", violation?.ruleId)
+    }
+
+    @Test
+    fun `plain dollar sign inside a string is not treated as interpolation`() {
+        val violation = EvaluateExpressionSafetyGuard.validate(
+            expression = """"cost: $ total" + suffix""",
+            mode = EvaluateExpressionSafetyMode.DEFAULT_BLOCKLIST,
+            context = null
+        )
+
+        assertNull(violation)
+    }
+
+    @Test
+    fun `identifier ending in f before a call is not mistaken for an f-string`() {
+        val violation = EvaluateExpressionSafetyGuard.validate(
+            expression = """valueOf("42")""",
+            mode = EvaluateExpressionSafetyMode.DEFAULT_BLOCKLIST,
+            context = null
+        )
+
+        assertNull(violation)
+    }
 }

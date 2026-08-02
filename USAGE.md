@@ -1376,32 +1376,38 @@ Additional blocked regex patterns can be configured in settings. They apply in `
 |------|------|----------------|
 | -32700 | Parse Error | Invalid JSON in request |
 | -32600 | Invalid Request | Missing required JSON-RPC fields |
-| -32601 | Method Not Found | Unknown tool or method name |
+| -32601 | Method Not Found | Unknown JSON-RPC *method*. An unknown *tool* is not a protocol error — see Tool Failures below |
 | -32602 | Invalid Params | Missing or invalid parameters |
 | -32603 | Internal Error | Unexpected server error |
 
-### Custom MCP Errors
+### Tool Failures
 
-| Code | Name | When It Occurs |
-|------|------|----------------|
-| -32001 | Session Not Found | Debug session doesn't exist |
-| -32002 | File Not Found | Specified file doesn't exist |
-| -32003 | Not Paused | Operation requires paused session |
-| -32004 | Breakpoint Error | Failed to set/remove breakpoint |
-| -32005 | Evaluation Error | Expression evaluation failed |
-
-### Example Error Response
+Tool failures are **not** JSON-RPC errors. A tool that fails returns a successful result whose
+payload carries `isError: true` and a human-readable message in `content[0].text`, so the model
+can read what went wrong and retry:
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "error": {
-    "code": -32003,
-    "message": "Session must be paused to get variables"
+  "result": {
+    "content": [{ "type": "text", "text": "Session must be paused to get variables" }],
+    "isError": true
   }
 }
 ```
+
+The JSON-RPC `error` channel is reserved for protocol-level problems — malformed JSON, an
+unparseable message, an unknown *method* (not an unknown tool).
+
+Project resolution is the one failure that returns structured JSON in `content[0].text`, because
+an agent that picked the wrong project needs the list of real ones to retry with:
+
+```json
+{ "error": "multiple_projects_open", "message": "...", "available_projects": [ ... ] }
+```
+
+`error` is one of `no_project_open`, `project_not_found` or `multiple_projects_open`.
 
 ### Handling Session State
 

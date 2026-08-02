@@ -1,18 +1,13 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.ui
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.ClearHistoryAction
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.CopyClientConfigAction
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.CopyServerUrlAction
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.ExportHistoryAction
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.InstallSkillAction
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.actions.RefreshAction
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.icons.McpIcons
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.settings.McpSettingsConfigurable
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.options.ShowSettingsUtil
@@ -37,17 +32,33 @@ import javax.swing.JPanel
 
 class McpToolWindowFactory : ToolWindowFactory, DumbAware {
 
+    private companion object {
+        const val REFRESH_ACTION_ID = "DebuggerMcpServer.Refresh"
+        const val COPY_SERVER_URL_ACTION_ID = "DebuggerMcpServer.CopyServerUrl"
+        const val CLEAR_HISTORY_ACTION_ID = "DebuggerMcpServer.ClearHistory"
+        const val EXPORT_HISTORY_ACTION_ID = "DebuggerMcpServer.ExportHistory"
+        const val COPY_CLIENT_CONFIG_ACTION_ID = "DebuggerMcpServer.CopyClientConfig"
+        const val INSTALL_SKILL_ACTION_ID = "DebuggerMcpServer.InstallSkill"
+
+        /** Actions are registered in plugin.xml; fetching by id keeps a single instance the
+         *  keymap, Find Action and this tool window all agree on. */
+        fun action(id: String): AnAction =
+            checkNotNull(ActionManager.getInstance().getAction(id)) {
+                "Action $id is not registered in plugin.xml"
+            }
+    }
+
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val panel = McpToolWindowPanel(project)
 
         // Left toolbar actions (utility buttons) - settings icon moved to separate component with label
         val leftActionGroup = DefaultActionGroup().apply {
-            add(RefreshAction())
+            add(action(REFRESH_ACTION_ID))
             addSeparator()
-            add(CopyServerUrlAction())
+            add(action(COPY_SERVER_URL_ACTION_ID))
             addSeparator()
-            add(ClearHistoryAction())
-            add(ExportHistoryAction())
+            add(action(CLEAR_HISTORY_ACTION_ID))
+            add(action(EXPORT_HISTORY_ACTION_ID))
         }
 
         val leftToolbar = ActionManager.getInstance().createActionToolbar(
@@ -61,7 +72,7 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
         val settingsPanel = createSettingsPanel(project)
 
         // Create prominent "Install on Coding Agents" button with text
-        val installAction = CopyClientConfigAction()
+        val installAction = action(COPY_CLIENT_CONFIG_ACTION_ID)
         val installButton = JButton("Install on Coding Agents").apply {
             icon = McpIcons.ToolWindow
             toolTipText = "Copy MCP client configuration to clipboard"
@@ -83,7 +94,7 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
             }
         }
 
-        val skillAction = InstallSkillAction()
+        val skillAction = action(INSTALL_SKILL_ACTION_ID)
         val skillButton = JButton("Get Companion Skill").apply {
             icon = AllIcons.Actions.Download
             toolTipText = "Install or export the companion skill for AI coding agents"
@@ -154,10 +165,14 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
             McpConstants.PLUGIN_NAME,
             false
         )
+        // Ties the panel's lifecycle to the content: when the tool window content is removed,
+        // the panel's dispose() runs, releasing its message-bus connection and history listener.
+        // Without this the panel is never disposed and leaks the Project.
+        content.setDisposer(panel)
         toolWindow.contentManager.addContent(content)
 
         // Also add quick actions to title bar
-        toolWindow.setTitleActions(listOf(CopyServerUrlAction(), RefreshAction()))
+        toolWindow.setTitleActions(listOf(action(COPY_SERVER_URL_ACTION_ID), action(REFRESH_ACTION_ID)))
     }
 
     override fun shouldBeAvailable(project: Project): Boolean = true

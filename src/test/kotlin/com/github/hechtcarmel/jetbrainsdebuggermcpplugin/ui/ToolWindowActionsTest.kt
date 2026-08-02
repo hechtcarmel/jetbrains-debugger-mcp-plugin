@@ -56,4 +56,53 @@ class ToolWindowActionsTest {
     fun `refresh action declares its update thread`() {
         assertEquals(ActionUpdateThread.EDT, RefreshAction().actionUpdateThread)
     }
+
+    private val factorySource: String =
+        File("src/main/kotlin/com/github/hechtcarmel/jetbrainsdebuggermcpplugin/ui/McpToolWindowFactory.kt")
+            .also { assertTrue("McpToolWindowFactory.kt not found at ${it.path} — has it moved?", it.isFile) }
+            .readText()
+
+    /**
+     * The panel is `Disposable` and owns an application message-bus connection plus a
+     * `CommandHistoryService` listener registration. Without `content.setDisposer(panel)` the
+     * platform never calls the panel's `dispose()`, so the panel — and through it the `Project` —
+     * leaks on every project close, and the plugin cannot unload dynamically.
+     */
+    @Test
+    fun `factory registers the panel as the content disposer`() {
+        assertTrue(
+            "McpToolWindowFactory must call content.setDisposer(panel) so the panel's dispose() " +
+                "releases its message-bus connection and history listener",
+            factorySource.contains("content.setDisposer(panel)")
+        )
+    }
+
+    /**
+     * The factory fetches its actions from `ActionManager` by id. `getAction` returns null for
+     * an unregistered id, which would blow up tool-window creation at runtime — so every id the
+     * factory references must have a matching registration in plugin.xml.
+     */
+    @Test
+    fun `every action id the factory references is registered in plugin xml`() {
+        val pluginXml = File("src/main/resources/META-INF/plugin.xml")
+            .also { assertTrue("plugin.xml not found at ${it.path}", it.isFile) }
+            .readText()
+
+        val referencedIds = Regex("\"(DebuggerMcpServer\\.[A-Za-z]+)\"")
+            .findAll(factorySource)
+            .map { it.groupValues[1] }
+            .toSortedSet()
+
+        assertTrue(
+            "expected the factory to reference DebuggerMcpServer.* action ids via ActionManager",
+            referencedIds.isNotEmpty()
+        )
+        for (id in referencedIds) {
+            assertTrue(
+                "plugin.xml must register an action with id=\"$id\" — the factory fetches it " +
+                    "via ActionManager and fails tool-window creation if it is missing",
+                pluginXml.contains("id=\"$id\"")
+            )
+        }
+    }
 }

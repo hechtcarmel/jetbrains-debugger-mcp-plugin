@@ -17,6 +17,21 @@ object EvaluateExpressionSafetyGuard {
         val regex: Regex
     )
 
+    /**
+     * Outcome of scanning an expression: either the expression with comments and string literals
+     * blanked out (safe to run the regex rules over), or a rejection.
+     *
+     * Rejection — not blanking — is deliberate for interpolated templates, backtick literals and
+     * unterminated strings. Interpolated segments are *code* in Kotlin/JS/Python/Ruby, so blanking
+     * them removes the payload **and** every token the blocklist and read-only rules look for:
+     * `"${Runtime.getRuntime().exec(cmd)}"` used to scan as an inert literal and pass even the
+     * strictest mode.
+     */
+    private sealed interface ExpressionScan {
+        data class Stripped(val text: String) : ExpressionScan
+        data class Rejected(val ruleId: String, val message: String, val token: String) : ExpressionScan
+    }
+
     private val blocklistRules = listOf(
         BlocklistRule(
             id = "process-execution",
@@ -71,8 +86,25 @@ object EvaluateExpressionSafetyGuard {
     ): EvaluationSafetyViolation? {
         if (mode == EvaluateExpressionSafetyMode.UNRESTRICTED) return null
 
-        val searchableExpression = stripCommentsAndStringLiterals(expression)
-            .take(MAX_SCANNED_EXPRESSION_LENGTH)
+        // Reject rather than truncate: a truncated scan would let a long no-op prefix push the
+        // payload past the analyzed window and disable the guard entirely.
+        if (expression.length > MAX_SCANNED_EXPRESSION_LENGTH) {
+            return EvaluationSafetyViolation(
+                mode = mode,
+                ruleId = "expression-too-long",
+                message = "expressions longer than $MAX_SCANNED_EXPRESSION_LENGTH characters cannot be safety-checked"
+            )
+        }
+
+        val searchableExpression = when (val scan = scanExpression(expression)) {
+            is ExpressionScan.Rejected -> return EvaluationSafetyViolation(
+                mode = mode,
+                ruleId = scan.ruleId,
+                message = scan.message,
+                token = scan.token
+            )
+            is ExpressionScan.Stripped -> scan.text
+        }
 
         checkBlocklist(searchableExpression, mode)?.let { return it }
         checkCustomRules(searchableExpression, mode, customRules)?.let { return it }
@@ -80,7 +112,7 @@ object EvaluateExpressionSafetyGuard {
         if (mode != EvaluateExpressionSafetyMode.READ_ONLY) return null
 
         if (context?.sourcePosition?.file?.extension == "java") {
-            val javaViolation = runJavaAnalyzer(context.project, expression, context.sourcePosition)
+            val javaViolation = runJavaAnalyzer(context.project, expression, context.sourcePosition, searchableExpression)
             if (javaViolation != null) return javaViolation
             return null
         }
@@ -194,7 +226,8 @@ object EvaluateExpressionSafetyGuard {
     private fun runJavaAnalyzer(
         project: Project,
         expression: String,
-        sourcePosition: XSourcePosition?
+        sourcePosition: XSourcePosition?,
+        searchableExpression: String
     ): EvaluationSafetyViolation? {
         return try {
             val analyzerClass = Class.forName(
@@ -203,19 +236,28 @@ object EvaluateExpressionSafetyGuard {
             val analyzer = analyzerClass.getField("INSTANCE").get(null) as ReadOnlyExpressionAnalyzer
             analyzer.check(project, expression, sourcePosition)
         } catch (_: ReflectiveOperationException) {
-            checkGenericReadOnly(stripCommentsAndStringLiterals(expression), EvaluateExpressionSafetyMode.READ_ONLY)
+            checkGenericReadOnly(searchableExpression, EvaluateExpressionSafetyMode.READ_ONLY)
         } catch (_: LinkageError) {
-            checkGenericReadOnly(stripCommentsAndStringLiterals(expression), EvaluateExpressionSafetyMode.READ_ONLY)
+            checkGenericReadOnly(searchableExpression, EvaluateExpressionSafetyMode.READ_ONLY)
         }
     }
 
-    internal fun stripCommentsAndStringLiterals(expression: String): String {
+    /**
+     * Blanks comments and plain string-literal contents so the regex rules only see code, and
+     * rejects the constructs that cannot be blanked safely:
+     *
+     * - `${` / `#{` inside a double-quoted literal (Kotlin/Groovy/JS and Ruby/Groovy interpolation)
+     * - backtick literals (JS template strings, Ruby shell execution)
+     * - f-string prefixes (Python interpolation)
+     * - an unterminated string literal, which would silently blank everything after it
+     */
+    private fun scanExpression(expression: String): ExpressionScan {
         val result = StringBuilder(expression.length)
         var index = 0
         var inLineComment = false
         var inBlockComment = false
         var inString = false
-        var stringDelimiter = '\u0000'
+        var stringDelimiter = ' '
         var escaped = false
 
         while (index < expression.length) {
@@ -241,6 +283,14 @@ object EvaluateExpressionSafetyGuard {
                     }
                 }
                 inString -> {
+                    if (!escaped && stringDelimiter == '"' && (current == '$' || current == '#') && next == '{') {
+                        return ExpressionScan.Rejected(
+                            ruleId = "interpolated-string-template",
+                            message = "interpolated string templates cannot be safety-checked because " +
+                                "interpolated segments execute as code",
+                            token = "$current{"
+                        )
+                    }
                     result.append(if (current == '\n' || current == '\r') current else ' ')
                     if (escaped) {
                         escaped = false
@@ -260,7 +310,23 @@ object EvaluateExpressionSafetyGuard {
                     result.append("  ")
                     index++
                 }
-                current == '"' || current == '\'' || current == '`' -> {
+                current == '`' -> {
+                    return ExpressionScan.Rejected(
+                        ruleId = "interpolated-string-template",
+                        message = "backtick literals cannot be safety-checked because they can execute " +
+                            "code (template strings, shell execution)",
+                        token = "`"
+                    )
+                }
+                current == '"' || current == '\'' -> {
+                    if (isFStringPrefix(expression, index)) {
+                        return ExpressionScan.Rejected(
+                            ruleId = "interpolated-string-template",
+                            message = "f-strings cannot be safety-checked because interpolated " +
+                                "segments execute as code",
+                            token = "f$current"
+                        )
+                    }
                     inString = true
                     stringDelimiter = current
                     escaped = false
@@ -272,6 +338,31 @@ object EvaluateExpressionSafetyGuard {
             index++
         }
 
-        return result.toString()
+        if (inString) {
+            return ExpressionScan.Rejected(
+                ruleId = "unterminated-string-literal",
+                message = "the expression contains an unterminated string literal and cannot be " +
+                    "safety-checked",
+                token = stringDelimiter.toString()
+            )
+        }
+
+        return ExpressionScan.Stripped(result.toString())
+    }
+
+    /**
+     * True when the quote at [quoteIndex] is preceded by a short Python string-prefix letter run
+     * containing `f`/`F` (`f"`, `rf'`, `FR"`, ...), i.e. the literal is an f-string.
+     */
+    private fun isFStringPrefix(expression: String, quoteIndex: Int): Boolean {
+        var start = quoteIndex
+        while (start > 0 && expression[start - 1].isLetter()) start--
+        val run = expression.substring(start, quoteIndex)
+        if (run.isEmpty() || run.length > 3) return false
+        if (!run.any { it == 'f' || it == 'F' }) return false
+        // A preceding identifier character means the letters are the tail of a longer identifier,
+        // not a string prefix.
+        val before = expression.getOrNull(start - 1)
+        return before == null || (!before.isLetterOrDigit() && before != '_' && before != '$')
     }
 }

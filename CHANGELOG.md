@@ -4,6 +4,46 @@
 
 ## [Unreleased]
 
+### Breaking
+- **Requires IntelliJ Platform 2025.2 or newer** (was 2025.1). The MCP SDK cannot be linked on 2025.1: it reaches `kotlin.time.Clock`, which that platform's bundled Kotlin standard library does not ship, and its Ktor version needs a coroutines API that 2025.1 does not have either.
+- **`initialize` now negotiates the protocol version** instead of reporting a fixed one per transport. A client that asks for `2024-11-05` is answered in `2024-11-05`; previously the streamable endpoint always claimed `2025-03-26` and the legacy endpoint always claimed `2024-11-05`, whatever the client requested.
+- **The server description moved from `serverInfo.description` to `instructions`.** `description` was never part of the MCP specification; `instructions` is where the spec carries this text.
+- **Calling an unknown tool now returns a normal result with `isError: true`** rather than a JSON-RPC protocol error, and the message no longer carries the doubled `Method not found: Tool not found:` prefix. This matches the error contract the plugin already documented, and unlike a transport error it is something a model can read and act on.
+- **`GET /debugger-mcp/streamable-http` now opens a server-to-client SSE stream** instead of returning `405`. This is what enables notifications, progress and cancellation.
+- **Input schemas no longer declare `additionalProperties: false`.** The MCP SDK's schema type cannot express it, so unrecognised arguments are no longer rejected by validating clients.
+- Malformed input is classified slightly differently: an empty body is `400` on every endpoint (the stateless endpoint previously answered `200`), a JSON object that is not a JSON-RPC message is a parse error (`-32700`) rather than an invalid request (`-32600`), an empty batch is accepted with nothing to answer rather than rejected, and batching `initialize` is no longer refused outright.
+- A request to the streamable endpoint without a session is still refused, but as `-32000 "Server not initialized"` rather than `-32600 "Missing Mcp-Session-Id header"`.
+- A notification is still answered `202`, but the body is now a JSON `null` literal rather than empty.
+- An `initialize` requesting a protocol version the server does not know is answered with the newest supported version (`2025-11-25`) instead of a fixed constant.
+- `Accept` and `Content-Type` remain advisory on the POST endpoints, as before: the SDK's strict header validation is relaxed at the edge so `curl`-style requests (wildcard `Accept`, implicit `Content-Type`) keep working.
+
+### Changed
+- **The hand-rolled MCP protocol layer has been replaced by the official [MCP Kotlin SDK](https://github.com/modelcontextprotocol/kotlin-sdk).** JSON-RPC framing, `initialize`, capability and version negotiation, `ping`, session lifecycle, batching and all three transports are now the SDK's. About 1,200 lines of protocol code were deleted. Endpoint URLs, the 23 tool names, parameters, descriptions and result shapes, and the `isError` error contract are unchanged (the one schema-level change is `additionalProperties`, above), so existing client configuration keeps working.
+- The plugin no longer bundles a Ktor HTTP *client*, which removes a latent `NoSuchMethodError` that shipped in previous releases.
+
+### Added
+- **Breakpoint `condition` and `log_message` expressions now pass through the Evaluate Expression safety guard.** Previously they were handed to the debugger unchecked, so a blocked operation could be smuggled past Read-only mode as a breakpoint condition.
+- `wait_for_pause`, `get_debug_session_status`: `stackSummary` now honours `max_stack_frames` with real frames, `totalStackDepth` is the real reported depth, `currentThread` is the actual thread name (was hardcoded `main`), and `threadCount` is the real thread count (was hardcoded 1).
+- Tool arguments are validated at the boundary: a wrong type (`line: "42"`), an out-of-range value (`frame_index: -1`) or an unknown enum value (`suspend_policy: "banana"`) now returns a clear typed error instead of being silently coerced, defaulted, or surfacing a raw exception.
+- Tool-window actions are registered with the platform (visible in Find Action, bindable in the keymap) and a **Tools → Debugger MCP Server** menu was added. Status icons now have dark-theme variants.
+- `SECURITY.md` (honest threat model) and `CONTRIBUTING.md`.
+
+### Fixed
+- Stack-frame `presentation` strings no longer disagree with the `line` field by one: they are now built from the same source position as the machine-readable fields instead of the platform's internal `toString()`, which encodes a 0-based line (live-QA finding 4.1).
+- A `suspend_policy: "none"` tracepoint is never reported as `breakpointHit` — it logs without suspending, so it cannot be the cause of a pause. Stepping onto a tracepoint's line previously misattributed the pause to it (live-QA finding 4.2).
+- Tools called without a `session_id` now fall back to the only live session when the IDE has no "current" one. A session that is running and has never paused is not "current", so `pause_execution` against it answered `No active debug session` even with exactly one session running (live-QA §5).
+- **`set_breakpoint` uses the breakpoint-manager API directly** instead of a UI toggle plus a fixed 100 ms sleep. Setting the same line twice now updates the existing breakpoint instead of deleting it, concurrent calls are safe, the intermittent "Failed to create breakpoint" under load is gone, and the call is faster.
+- **Tool calls no longer hang while a modal dialog is open in the IDE.** Execution-control and breakpoint tools used `invokeAndWait` with the default modality, which queued behind any open dialog; `wait_for_pause`'s auto-resume had the same defect.
+- **Deep stack traces no longer break every stack operation**: the frame collector resumed its continuation once per debugger batch, throwing `Already resumed` on the debugger thread for any stack deep enough to arrive in two batches.
+- **`pausedReason` and `breakpointHit` are computed from the pause site**, not the currently selected frame — `select_stack_frame` no longer changes what breakpoint the status reports — and disabled or muted breakpoints are no longer reported as hit.
+- The Evaluate Expression safety guard **rejects** interpolated string templates (Kotlin `${...}`, JS backticks, Python f-strings, Ruby `#{}`), unterminated string literals and over-length expressions instead of blanking them — blanking let `"${Runtime.getRuntime().exec(cmd)}"` pass the strictest mode.
+- `log_message` breakpoints in Rust/Go/Swift/C/C++ files are rejected with a clear error at `set_breakpoint` instead of silently storing Java-syntax expressions those debuggers cannot evaluate; multi-part Java log messages starting with an expression now concatenate as strings instead of adding integers.
+- Session and breakpoint ids are stable UUIDs instead of JVM `hashCode()` values, which could collide and make `remove_breakpoint` or `session_id` lookups ambiguous.
+- The MCP server binds its port when the IDE finishes starting up, not when anything first touches the service — opening the tool window or settings no longer starts the server as a side effect, and the "server started" notification appears once per IDE session instead of on every project open.
+- The version reported to MCP clients is read from the installed plugin descriptor at runtime, so it can never drift from the shipped version again.
+- The tool window releases its listeners when closed (it previously leaked the project through an unregistered disposable).
+
+
 ## [4.4.0] - 2026-08-01
 
 ### Fixed

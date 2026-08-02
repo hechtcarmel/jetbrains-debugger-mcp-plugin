@@ -1,20 +1,19 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.variable
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.VariableInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.VariablesResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.FrameVariablesCollector
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.StackFrameUtils
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.frame.XStackFrame
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -31,7 +30,7 @@ class GetVariablesTool : AbstractMcpTool() {
         Use to inspect local variables, parameters, and accessible fields. For complex objects, use evaluate_expression to see their contents.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.readOnly("Get Variables")
+    override val annotations = ToolAnnotationPresets.readOnly("Get Variables")
 
     override val outputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -67,30 +66,17 @@ class GetVariablesTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("frame_index") {
-                put("type", "integer")
-                put("description", "Stack frame index (0 = current frame)")
-                put("default", 0)
-                put("minimum", 0)
-            }
+            put("frame_index", integerProperty("Stack frame index (0 = current frame)", default = 0, minimum = 0))
         }
         put("required", buildJsonArray { })
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val frameIndex = arguments["frame_index"]?.jsonPrimitive?.intOrNull ?: 0
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val frameIndex = ToolArguments.optionalInt(arguments, "frame_index", default = 0, min = 0)
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to get variables")
-        }
+        val session = requirePausedSession(project, sessionId, "get variables")
 
         val frame = if (frameIndex == 0) {
             session.currentStackFrame

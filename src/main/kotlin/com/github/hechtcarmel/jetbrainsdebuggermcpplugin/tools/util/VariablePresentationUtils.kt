@@ -1,12 +1,12 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util
 
 import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.xdebugger.XDebuggerBundle
 import com.intellij.xdebugger.frame.XFullValueEvaluator
 import com.intellij.xdebugger.frame.XValue
 import com.intellij.xdebugger.frame.XValueNode
 import com.intellij.xdebugger.frame.XValuePlace
 import com.intellij.xdebugger.frame.presentation.XValuePresentation
-import com.intellij.xdebugger.impl.ui.XDebuggerUIConstants
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.swing.Icon
@@ -35,13 +35,20 @@ object VariablePresentationUtils {
 
     /**
      * Transient texts the platform debuggers show while computing a value asynchronously.
-     * The JVM debugger's ClassRenderer returns XDebuggerUIConstants.getCollectingDataMessage()
-     * until the debuggee-side toString() evaluation completes, then fires a second
-     * setPresentation with the real value (see issue #51).
+     * The JVM debugger's ClassRenderer returns the "Collecting data…" message until the
+     * debuggee-side toString() evaluation completes, then fires a second setPresentation with
+     * the real value (see issue #51).
+     *
+     * The bundle keys mirror the internal `XDebuggerUIConstants.getCollectingDataMessage()` /
+     * `getEvaluatingExpressionMessage()` (an `.impl.` class this plugin must not depend on);
+     * [XDebuggerBundle] is the public API both read from. The English literals are a safety
+     * net in case a platform update renames the keys.
      */
     fun defaultPlaceholderTexts(): Set<String> = setOf(
-        XDebuggerUIConstants.getCollectingDataMessage(),
-        XDebuggerUIConstants.getEvaluatingExpressionMessage()
+        XDebuggerBundle.message("xdebugger.building.tree.node.message"),
+        XDebuggerBundle.message("xdebugger.evaluating.expression.node.message"),
+        "Collecting data…",
+        "Evaluating…"
     )
 
     /**

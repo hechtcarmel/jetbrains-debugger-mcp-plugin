@@ -1,4 +1,5 @@
 # MCP tool manifest — golden snapshot
+# Snapshot of the SDK Tool as serialized to clients, not of the authored schema.
 # Regenerate: ./gradlew test --tests "*ToolManifestContractTest" -Dcontract.update=true
 # tools: 23
 
@@ -19,7 +20,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "expression": {
         "description": "Expression to evaluate in the current context. Can be a variable name, method call, arithmetic, or complex expression. May be blocked by the IDE's Evaluate Expression safety mode. Examples: 'x', 'list.size()', 'a + b * 2', 'String.format(\"%d\", count)'",
@@ -62,7 +62,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "mode": {
         "default": "debug",
@@ -104,7 +103,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "include_source_context": {
         "default": true,
@@ -355,7 +353,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "file_path": {
         "description": "Absolute path to the source file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources). If not provided, uses current debug position.",
@@ -407,7 +404,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "max_frames": {
         "default": 50,
@@ -518,7 +514,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "frame_index": {
         "default": 0,
@@ -610,7 +605,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -637,7 +631,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -664,7 +657,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -691,7 +683,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -722,7 +713,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -753,7 +743,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "breakpoint_id": {
         "description": "ID of the breakpoint to remove",
@@ -786,7 +775,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -817,7 +805,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "file_path": {
         "description": "Absolute path to the source file. Files inside JAR/ZIP archives are supported with the '!/' separator, e.g. '/path/to/lib-sources.jar!/com/example/Foo.kt' (the IDE's 'Copy Absolute Path' format for library sources).",
@@ -860,7 +847,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "frame_index": {
         "description": "Index of the stack frame to select (0 = topmost)",
@@ -898,7 +884,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "condition": {
         "description": "Boolean expression that must evaluate to true for the breakpoint to pause execution. Uses the target language syntax (e.g., 'count > 10', 'name.equals(\"test\")'). Evaluated each time the line is reached.",
@@ -967,7 +952,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "new_value": {
         "description": "New value as a string expression. For primitives: '42', '3.14', 'true'. For strings: '\"hello\"' (with quotes). For null: 'null'. Can also be an expression that evaluates to the target type.",
@@ -1009,7 +993,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "configuration_name": {
         "description": "Name of the run configuration to debug",
@@ -1042,7 +1025,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -1073,7 +1055,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -1104,7 +1085,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -1135,7 +1115,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "project_path": {
         "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
@@ -1169,7 +1148,6 @@ annotations:
   }
 inputSchema:
   {
-    "additionalProperties": false,
     "properties": {
       "breakpoint_ids": {
         "description": "If set, only complete when one of these breakpoints is hit. Non-matching breakpoint pauses are auto-resumed. Pauses where no breakpoint is detected at the current location (e.g., exceptions, manual pauses) return immediately. Note: detection uses file/line heuristics and may not distinguish all pause causes perfectly.",

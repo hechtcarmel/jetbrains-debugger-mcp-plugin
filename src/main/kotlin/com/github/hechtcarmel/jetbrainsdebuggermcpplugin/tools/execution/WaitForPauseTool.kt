@@ -1,14 +1,16 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.WaitForPauseResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.putSessionStatusProperties
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.SessionStatusCollector
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebugSessionListener
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
@@ -16,11 +18,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
@@ -41,7 +39,7 @@ class WaitForPauseTool : AbstractMcpTool() {
         Optionally filter by breakpoint_ids to only return when specific breakpoints are hit — non-matching breakpoint pauses are auto-resumed.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Wait For Pause")
+    override val annotations = ToolAnnotationPresets.mutable("Wait For Pause")
 
     override val outputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -51,80 +49,7 @@ class WaitForPauseTool : AbstractMcpTool() {
             putJsonObject("sessionId") { put("type", "string"); put("description", "Debug session ID") }
             putJsonObject("name") { put("type", "string"); put("description", "Debug session display name") }
             putJsonObject("state") { put("type", "string"); put("description", "Session state: 'running', 'paused', or 'stopped'") }
-            putJsonObject("pausedReason") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) }; put("description", "Why execution paused: 'breakpoint', 'step', 'exception', or 'pause'") }
-            putJsonObject("currentLocation") {
-                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
-                putJsonObject("properties") {
-                    putJsonObject("file") { put("type", "string") }
-                    putJsonObject("line") { put("type", "integer") }
-                    putJsonObject("className") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    putJsonObject("methodName") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                }
-                put("description", "Current execution location")
-            }
-            putJsonObject("variables") {
-                put("type", "array")
-                putJsonObject("items") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("name") { put("type", "string") }
-                        putJsonObject("value") { put("type", "string") }
-                        putJsonObject("type") { put("type", "string") }
-                        putJsonObject("hasChildren") { put("type", "boolean") }
-                    }
-                }
-                put("description", "Variables visible in current stack frame")
-            }
-            putJsonObject("stackSummary") {
-                put("type", "array")
-                putJsonObject("items") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("index") { put("type", "integer") }
-                        putJsonObject("file") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                        putJsonObject("line") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
-                        putJsonObject("className") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                        putJsonObject("methodName") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    }
-                }
-                put("description", "Stack trace summary")
-            }
-            putJsonObject("sourceContext") {
-                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
-                put("description", "Source code around the current execution point")
-            }
-            putJsonObject("breakpointHit") {
-                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
-                putJsonObject("properties") {
-                    putJsonObject("breakpointId") { put("type", "string") }
-                    putJsonObject("type") { put("type", "string") }
-                    putJsonObject("file") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    putJsonObject("line") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
-                    putJsonObject("condition") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    putJsonObject("hitCount") { put("type", "integer") }
-                }
-                put("description", "The breakpoint at the current location, when the pause was caused by one")
-            }
-            putJsonObject("totalStackDepth") {
-                put("type", "integer")
-                put("description", "Number of frames reported in stackSummary")
-            }
-            putJsonObject("currentThread") {
-                putJsonArray("type") { add(JsonPrimitive("object")); add(JsonPrimitive("null")) }
-                putJsonObject("properties") {
-                    putJsonObject("id") { put("type", "string") }
-                    putJsonObject("name") { put("type", "string") }
-                    putJsonObject("state") { put("type", "string") }
-                    putJsonObject("isCurrent") { put("type", "boolean") }
-                    putJsonObject("group") { putJsonArray("type") { add(JsonPrimitive("string")); add(JsonPrimitive("null")) } }
-                    putJsonObject("frameCount") { putJsonArray("type") { add(JsonPrimitive("integer")); add(JsonPrimitive("null")) } }
-                }
-                put("description", "The thread the debugger is currently focused on")
-            }
-            putJsonObject("threadCount") {
-                put("type", "integer")
-                put("description", "Number of threads reported for the session")
-            }
+            putSessionStatusProperties()
         }
         put("required", buildJsonArray { add(JsonPrimitive("waitResult")); add(JsonPrimitive("message")); add(JsonPrimitive("sessionId")); add(JsonPrimitive("name")); add(JsonPrimitive("state")) })
     }
@@ -134,15 +59,8 @@ class WaitForPauseTool : AbstractMcpTool() {
         putJsonObject("properties") {
             val (propName, propSchema) = projectPathProperty()
             put(propName, propSchema)
-            putJsonObject("session_id") {
-                put("type", "string")
-                put("description", "Debug session ID. If omitted, uses the current session. If no session exists yet, waits for one to appear (useful right after start_debug_session).")
-            }
-            putJsonObject("timeout") {
-                put("type", "integer")
-                put("description", "Maximum wait time in seconds. Must be positive.")
-                put("minimum", 1)
-            }
+            put("session_id", stringProperty("Debug session ID. If omitted, uses the current session. If no session exists yet, waits for one to appear (useful right after start_debug_session)."))
+            put("timeout", integerProperty("Maximum wait time in seconds. Must be positive.", minimum = 1))
             putJsonObject("breakpoint_ids") {
                 put("type", "array")
                 putJsonObject("items") { put("type", "string") }
@@ -155,11 +73,10 @@ class WaitForPauseTool : AbstractMcpTool() {
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val timeoutSeconds = arguments["timeout"]?.jsonPrimitive?.intOrNull
-            ?: return createErrorResult("Missing required parameter: timeout")
-        val breakpointIds = arguments["breakpoint_ids"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet()
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val timeoutSeconds = ToolArguments.requireInt(arguments, "timeout")
+        val breakpointIds = ToolArguments.optionalStringList(arguments, "breakpoint_ids")?.toSet()
 
         if (timeoutSeconds < 1) {
             return createErrorResult("timeout must be positive")
@@ -241,7 +158,7 @@ class WaitForPauseTool : AbstractMcpTool() {
                     createJsonResult(WaitForPauseResult(
                         waitResult = "timeout",
                         message = "No pause within ${timeoutSeconds}s",
-                        sessionId = session.hashCode().toString(),
+                        sessionId = getSessionId(session),
                         name = session.sessionName,
                         state = if (session.isStopped) "stopped" else if (session.isPaused) "paused" else "running"
                     ))
@@ -286,18 +203,20 @@ class WaitForPauseTool : AbstractMcpTool() {
             return
         }
 
-        ApplicationManager.getApplication().invokeLater {
+        // ModalityState.any(): with the default modality this auto-resume queues until the user
+        // closes whatever modal dialog happens to be open, leaving the session paused indefinitely.
+        ApplicationManager.getApplication().invokeLater({
             if (!session.isStopped && session.isPaused) {
                 session.resume()
             }
-        }
+        }, com.intellij.openapi.application.ModalityState.any())
     }
 
     private fun buildStoppedResult(session: XDebugSession): WaitForPauseResult {
         return WaitForPauseResult(
             waitResult = "session_stopped",
             message = "Debug session ended while waiting",
-            sessionId = session.hashCode().toString(),
+            sessionId = getSessionId(session),
             name = session.sessionName,
             state = "stopped"
         )

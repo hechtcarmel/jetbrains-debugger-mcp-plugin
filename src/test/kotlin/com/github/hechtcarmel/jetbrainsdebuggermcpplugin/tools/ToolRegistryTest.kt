@@ -1,7 +1,7 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import com.intellij.openapi.project.Project
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -90,10 +90,10 @@ class ToolRegistryTest {
     }
 
     @Test
-    fun `getToolDefinitions returns correct definitions`() {
+    fun `tools map to SDK definitions`() {
         registry.register(createMockTool("def_tool", "Definition description"))
 
-        val definitions = registry.getToolDefinitions()
+        val definitions = registry.getAllTools().map { it.toSdkTool() }
 
         assertEquals(1, definitions.size)
         assertEquals("def_tool", definitions[0].name)
@@ -133,19 +133,18 @@ class ToolRegistryTest {
     fun `tool definitions have required schema properties`() {
         registry.register(createMockTool("schema_test", "Test schema"))
 
-        val definitions = registry.getToolDefinitions()
-        val schema = definitions[0].inputSchema
+        val schema = registry.getAllTools().single().toSdkTool().inputSchema
 
-        assertEquals("object", schema["type"]?.toString()?.trim('"'))
-        assertTrue(schema.containsKey("properties"))
+        assertEquals("object", schema.type)
+        assertNotNull(schema.properties)
     }
 
     @Test
-    fun `getToolDefinitions includes annotations`() {
-        val tool = createMockToolWithAnnotations("annotated_tool", "Tool with annotations", ToolAnnotations.readOnly("Test"))
+    fun `mapped SDK definitions include annotations`() {
+        val tool = createMockToolWithAnnotations("annotated_tool", "Tool with annotations", ToolAnnotationPresets.readOnly("Test"))
         registry.register(tool)
 
-        val definitions = registry.getToolDefinitions()
+        val definitions = registry.getAllTools().map { it.toSdkTool() }
         val definition = definitions.find { it.name == "annotated_tool" }
 
         assertNotNull(definition?.annotations)
@@ -224,16 +223,6 @@ class ToolRegistryTest {
     }
 
     @Test
-    fun `getToolDefinitions returns copy not reference`() {
-        registry.register(createMockTool("tool", "Description"))
-
-        val defs1 = registry.getToolDefinitions()
-        val defs2 = registry.getToolDefinitions()
-
-        assertNotSame(defs1, defs2)
-    }
-
-    @Test
     fun `register with empty name still works`() {
         val tool = createMockTool("", "Empty name tool")
         registry.register(tool)
@@ -251,7 +240,7 @@ class ToolRegistryTest {
     }
 
     private fun createMockTool(name: String, description: String): McpTool {
-        return createMockToolWithAnnotations(name, description, ToolAnnotations.readOnly(name))
+        return createMockToolWithAnnotations(name, description, ToolAnnotationPresets.readOnly(name))
     }
 
     private fun createMockToolWithAnnotations(name: String, description: String, toolAnnotations: ToolAnnotations): McpTool {
@@ -264,8 +253,8 @@ class ToolRegistryTest {
             }
             override val annotations: ToolAnnotations = toolAnnotations
 
-            override suspend fun execute(project: Project, arguments: JsonObject): ToolCallResult {
-                return ToolCallResult(content = emptyList(), isError = false)
+            override suspend fun execute(project: Project, arguments: JsonObject): CallToolResult {
+                return CallToolResult(content = emptyList(), isError = false)
             }
         }
     }

@@ -1,6 +1,5 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolDefinition
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.ListBreakpointsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.RemoveBreakpointTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.SetBreakpointTool
@@ -40,16 +39,6 @@ class ToolRegistry {
     fun getTool(name: String): McpTool? = tools[name]
 
     fun getAllTools(): List<McpTool> = tools.values.toList()
-
-    fun getToolDefinitions(): List<ToolDefinition> = tools.values.map { tool ->
-        ToolDefinition(
-            name = tool.name,
-            description = tool.description,
-            inputSchema = tool.inputSchema,
-            outputSchema = tool.outputSchema,
-            annotations = tool.annotations
-        )
-    }
 
     fun getToolCount(): Int = tools.size
 

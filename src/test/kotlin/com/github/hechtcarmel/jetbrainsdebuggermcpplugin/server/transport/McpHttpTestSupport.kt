@@ -1,17 +1,12 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.transport
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.JsonRpcHandler
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp.McpServerFactory
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp.McpToolBridge
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.KtorMcpServer
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.KtorSseSessionManager
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.StreamableHttpSessionManager
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolRegistry
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -29,15 +24,10 @@ import java.util.concurrent.TimeUnit
  *
  * ## Why this exists
  *
- * Before this class the entire transport layer — every route, status code, header, Origin
- * decision, session-id rule and SSE frame — was verified by nothing. The pre-existing server
- * tests called [JsonRpcHandler] directly with hand-built envelopes, which cannot observe anything
- * Ktor does, and which are scheduled for deletion along with the handler when the plugin migrates
- * to the official MCP Kotlin SDK.
- *
- * Everything asserted through this harness is *client-observable behaviour*, so it stays
- * meaningful across that migration: the tests describe what an MCP client sees, not how the
- * server is built.
+ * Everything asserted through this harness is *client-observable behaviour*: the tests describe
+ * what an MCP client sees over real HTTP, not how the server is built. That is what allowed the
+ * hand-rolled protocol layer to be replaced by the MCP Kotlin SDK with the suite as the referee —
+ * and it is what will keep an SDK version bump honest next time.
  *
  * ## Why the JDK HTTP client
  *
@@ -48,7 +38,6 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
 
     protected val json = Json { ignoreUnknownKeys = true }
 
-    private lateinit var scope: CoroutineScope
     private lateinit var server: KtorMcpServer
     private lateinit var http: HttpClient
     protected var port: Int = 0
@@ -56,17 +45,18 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
     protected lateinit var registry: ToolRegistry
         private set
 
+    /** The SDK server behind the HTTP edge — exposed so tests can assert on session lifecycle. */
+    protected lateinit var mcpServer: io.modelcontextprotocol.kotlin.sdk.server.Server
+        private set
+
     override fun setUp() {
         super.setUp()
         registry = ToolRegistry().apply { registerBuiltInTools() }
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         port = freePort()
+        mcpServer = McpServerFactory.create(registry, McpToolBridge())
         server = KtorMcpServer(
             port = port,
-            jsonRpcHandler = JsonRpcHandler(registry),
-            sseSessionManager = KtorSseSessionManager(),
-            streamableHttpSessionManager = StreamableHttpSessionManager(),
-            coroutineScope = scope
+            mcpServer = mcpServer,
         )
         val result = server.start()
         assertEquals("MCP server failed to start on port $port: $result", KtorMcpServer.StartResult.Success, result)
@@ -78,7 +68,6 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
         try {
             if (::http.isInitialized) http.close()
             if (::server.isInitialized) server.stop()
-            if (::scope.isInitialized) scope.cancel()
         } finally {
             super.tearDown()
         }
@@ -103,6 +92,8 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
         throw AssertionError("MCP server never accepted connections on port $port", lastFailure)
     }
 
+    // ponytail: retry rather than lock. The window between releasing the probe socket and the
+    // server binding is tiny, and the suite runs single-forked.
     private fun freePort(): Int = ServerSocket(0).use { it.localPort }
 
     // ── Requests ────────────────────────────────────────────────────────────────────────
@@ -118,6 +109,23 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
     protected fun get(path: String, headers: Map<String, String> = emptyMap()): HttpResponse<String> =
         send(requestBuilder(path, headers).GET())
 
+    /**
+     * Opens an SSE stream and returns as soon as the response *headers* arrive.
+     *
+     * A plain [get] would block until the server closed the body, which for an event stream is
+     * never — the request would sit there until its timeout and report a misleading failure.
+     * The caller gets the status and headers, and the lazy line stream, which it should close.
+     */
+    protected fun openEventStream(
+        path: String,
+        headers: Map<String, String> = emptyMap()
+    ): HttpResponse<java.util.stream.Stream<String>> = pumpingEdt {
+        http.sendAsync(
+            requestBuilder(path, headers).GET().build(),
+            HttpResponse.BodyHandlers.ofLines(),
+        ).get(20, TimeUnit.SECONDS)
+    }
+
     protected fun delete(path: String, headers: Map<String, String> = emptyMap()): HttpResponse<String> =
         send(requestBuilder(path, headers).DELETE())
 
@@ -126,8 +134,13 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
 
     private fun requestBuilder(path: String, headers: Map<String, String>): HttpRequest.Builder {
         val builder = HttpRequest.newBuilder(URI.create(url(path)))
-            .timeout(Duration.ofSeconds(30))
+            // Must exceed pumpingEdt's own deadline, so a genuine EDT deadlock surfaces as the
+            // pump timeout (which names the cause) rather than as a misleading HTTP timeout.
+            .timeout(Duration.ofSeconds(90))
             .header("Content-Type", "application/json")
+        if (headers.keys.none { it.equals("Accept", ignoreCase = true) }) {
+            builder.header("Accept", "application/json, text/event-stream")
+        }
         headers.forEach { (name, value) -> builder.header(name, value) }
         return builder
     }
@@ -150,13 +163,13 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
 
     protected fun HttpResponse<String>.jsonBody(): JsonObject = json.parseToJsonElement(body()).jsonObject
 
-    protected fun HttpResponse<String>.header(name: String): String? = headers().firstValue(name).orElse(null)
+    protected fun HttpResponse<*>.header(name: String): String? = headers().firstValue(name).orElse(null)
 
     /**
      * Completes the streamable-HTTP handshake and returns the issued session id.
      *
-     * Every non-initialize request on that transport is rejected without it
-     * (KtorMcpServer.validateStreamableSession).
+     * Every non-initialize request on that transport is rejected without it — the SDK's session
+     * state machine answers `-32000 "Server not initialized"`.
      */
     protected fun initializeStreamable(): String {
         val response = post(
@@ -196,7 +209,16 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
             PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
             Thread.sleep(5)
         }
-        check(future.isDone) { "Timed out after ${timeoutMs}ms while pumping the EDT" }
-        return future.get(10, TimeUnit.SECONDS)
+        check(future.isDone) {
+            "Timed out after ${timeoutMs}ms while pumping the EDT — the call under test is most " +
+                "likely blocked waiting on the EDT that this thread is pumping."
+        }
+        // future.get wraps whatever block() threw in an ExecutionException, which buries the
+        // assertion message the test author actually wrote. Rethrow the cause.
+        return try {
+            future.get(10, TimeUnit.SECONDS)
+        } catch (e: java.util.concurrent.ExecutionException) {
+            throw e.cause ?: e
+        }
     }
 }

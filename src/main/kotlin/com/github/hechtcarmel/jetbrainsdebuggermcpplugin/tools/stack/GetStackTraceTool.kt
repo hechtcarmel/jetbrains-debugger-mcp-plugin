@@ -1,19 +1,18 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StackFrameInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StackTraceResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.StackFrameUtils
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.openapi.project.Project
 import com.intellij.xdebugger.frame.XStackFrame
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -30,7 +29,7 @@ class GetStackTraceTool : AbstractMcpTool() {
         Use to understand the sequence of function calls. Each frame includes file, line, class, and method information.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.readOnly("Get Stack Trace")
+    override val annotations = ToolAnnotationPresets.readOnly("Get Stack Trace")
 
     override val outputSchema: JsonObject = buildJsonObject {
         put("type", "object")
@@ -65,31 +64,17 @@ class GetStackTraceTool : AbstractMcpTool() {
             put(propName, propSchema)
             val (sessionName, sessionSchema) = sessionIdProperty()
             put(sessionName, sessionSchema)
-            putJsonObject("max_frames") {
-                put("type", "integer")
-                put("description", "Maximum number of frames to return")
-                put("default", 50)
-                put("minimum", 1)
-                put("maximum", 200)
-            }
+            put("max_frames", integerProperty("Maximum number of frames to return", default = 50, minimum = 1, maximum = 200))
         }
         put("required", buildJsonArray { })
         put("additionalProperties", false)
     }
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
-        val maxFrames = arguments["max_frames"]?.jsonPrimitive?.intOrNull ?: 50
+    override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
+        val sessionId = ToolArguments.optionalString(arguments, "session_id")
+        val maxFrames = ToolArguments.optionalInt(arguments, "max_frames", default = 50, min = 1, max = 200)
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to get stack trace")
-        }
+        val session = requirePausedSession(project, sessionId, "get stack trace")
 
         val suspendContext = session.suspendContext
             ?: return createErrorResult("No suspend context available")
@@ -120,7 +105,7 @@ class GetStackTraceTool : AbstractMcpTool() {
             methodName = StackFrameUtils.extractMethodName(frame),
             isCurrent = index == 0,
             isLibrary = StackFrameUtils.isLibraryPath(path),
-            presentation = frame.toString().take(150)
+            presentation = StackFrameUtils.formatPresentation(frame).take(150)
         )
     }
 }

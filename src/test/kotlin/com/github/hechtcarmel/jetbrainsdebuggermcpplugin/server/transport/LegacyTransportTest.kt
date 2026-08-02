@@ -40,15 +40,33 @@ class LegacyTransportTest : McpHttpTestCase() {
     }
 
     /**
-     * The stateless endpoint reports the 2024-11-05 protocol while the streamable endpoint
-     * reports 2025-03-26 — the version is a per-transport constant, not a negotiation.
+     * The version is *negotiated* rather than hardcoded per transport: the server echoes back
+     * the version the client asked for, provided it supports it. Before the SDK migration every
+     * request to this endpoint got a fixed `2024-11-05` no matter what the client requested.
      */
-    fun `test stateless initialize reports the legacy protocol version`() {
-        val response = post(McpConstants.MCP_ENDPOINT_PATH, rpc("initialize", params = "{}"))
+    fun `test stateless initialize negotiates the requested protocol version`() {
+        // 2025-03-26 is deliberately NOT what this endpoint used to answer (it hardcoded
+        // 2024-11-05), so an echo here proves negotiation rather than a lucky constant.
+        val response = post(McpConstants.MCP_ENDPOINT_PATH, initializeRequest("2025-03-26"))
 
         assertEquals(
-            McpConstants.LEGACY_MCP_PROTOCOL_VERSION,
+            "2025-03-26",
             response.jsonBody()["result"]!!.jsonObject["protocolVersion"]!!.jsonPrimitive.content
+        )
+    }
+
+    /**
+     * The server's prose description moved from a non-standard `serverInfo.description` field to
+     * `instructions`, which is where the MCP specification actually carries it.
+     */
+    fun `test initialize carries the server description as instructions`() {
+        val result = post(McpConstants.MCP_ENDPOINT_PATH, initializeRequest("2024-11-05"))
+            .jsonBody()["result"]!!.jsonObject
+
+        assertNull("description was never a spec field", result["serverInfo"]!!.jsonObject["description"])
+        assertTrue(
+            "instructions should carry the server description",
+            result["instructions"]!!.jsonPrimitive.content.contains("Debug applications running in JetBrains IDEs")
         )
     }
 
@@ -62,14 +80,14 @@ class LegacyTransportTest : McpHttpTestCase() {
     }
 
     /**
-     * An empty body returns **200** here but **400** on the streamable path. The asymmetry is
-     * pinned deliberately: it is the kind of detail a rewrite silently normalises, and doing so
-     * changes what existing clients see.
+     * An empty body is now a **400** on this endpoint as well. It used to answer 200 here and 400
+     * on the streamable path — an asymmetry that existed only because two hand-written handlers
+     * disagreed. Both paths now run the same SDK transport, so they agree.
      */
-    fun `test stateless empty body is a parse error with 200 unlike the streamable path`() {
+    fun `test stateless empty body is a parse error with 400`() {
         val response = post(McpConstants.MCP_ENDPOINT_PATH, "")
 
-        assertEquals("The legacy endpoint answers 200 even for a parse error", 200, response.statusCode())
+        assertEquals(400, response.statusCode())
         assertEquals(-32700, response.jsonBody()["error"]!!.jsonObject["code"]!!.jsonPrimitive.intOrNull)
     }
 
@@ -171,5 +189,56 @@ class LegacyTransportTest : McpHttpTestCase() {
             }
         }
         throw AssertionError("Timed out waiting for SSE '$expectedEvent' event")
+    }
+
+    /**
+     * `initialize` params are validated by the SDK now, so they have to be complete — an empty
+     * object is rejected rather than silently accepted.
+     */
+    private fun initializeRequest(protocolVersion: String): String = rpc(
+        "initialize",
+        params = """{"protocolVersion":"$protocolVersion","capabilities":{},"clientInfo":{"name":"t","version":"1"}}"""
+    )
+
+    /**
+     * The stateless endpoint mints one SDK ServerSession per request against the single shared
+     * Server. Server.createSession only deregisters a session when it *closes*, and the transport
+     * only closes explicitly — so without the transport.close() in KtorMcpServer's stateless
+     * handler, every request here would leak a session (plus its notification subscription) for
+     * the life of the IDE. This pins the release.
+     */
+    fun `test stateless requests do not accumulate sessions on the shared server`() {
+        repeat(5) { post(McpConstants.MCP_ENDPOINT_PATH, rpc("tools/list")) }
+
+        // The release runs in the request coroutine *after* the response is written, so give it a
+        // bounded moment rather than racing it. What is pinned is that sessions do not
+        // accumulate — not that the close beats the HTTP client back.
+        val deadline = System.currentTimeMillis() + 5_000
+        while (mcpServer.sessions.isNotEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20)
+        }
+
+        assertEquals(
+            "stateless sessions must be closed after each request",
+            emptySet<Any>(),
+            mcpServer.sessions.keys
+        )
+    }
+
+    /**
+     * `Accept` and `Content-Type` stay advisory on the POST endpoints, as they always were. The
+     * SDK transports would reject curl's defaults (the wildcard Accept is a substring miss for
+     * its check; the implicit form-urlencoded Content-Type is a 415) — `withLenientMcpHeaders`
+     * normalises both before the SDK sees the request. This plugin's issue history is one
+     * connection bug after another; a header the server never used to read must not start
+     * rejecting clients that worked yesterday.
+     */
+    fun `test curl-style headers are accepted on the stateless endpoint`() {
+        val wildcardAccept = post(McpConstants.MCP_ENDPOINT_PATH, rpc("tools/list"), mapOf("Accept" to "*/*"))
+        assertEquals("Accept: */* must not be rejected", 200, wildcardAccept.statusCode())
+        assertTrue("tools" in wildcardAccept.jsonBody()["result"]!!.jsonObject)
+
+        val plainText = post(McpConstants.MCP_ENDPOINT_PATH, rpc("tools/list"), mapOf("Content-Type" to "text/plain"))
+        assertEquals("a non-JSON Content-Type must not be rejected", 200, plainText.statusCode())
     }
 }

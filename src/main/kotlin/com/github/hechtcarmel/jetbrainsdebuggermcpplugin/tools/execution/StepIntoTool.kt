@@ -1,22 +1,12 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution
 
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolAnnotations
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.models.ToolCallResult
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
-import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.ExecutionControlResult
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.project.Project
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
+import com.intellij.xdebugger.XDebugSession
 
 /**
  * Steps into the function call on the current line.
  */
-class StepIntoTool : AbstractMcpTool() {
+class StepIntoTool : AbstractExecutionControlTool() {
 
     override val name = "step_into"
 
@@ -25,47 +15,15 @@ class StepIntoTool : AbstractMcpTool() {
         Use when you need to debug inside a function. If no function call exists on the current line, behaves like step_over.
     """.trimIndent()
 
-    override val annotations = ToolAnnotations.mutable("Step Into")
+    override val annotations = ToolAnnotationPresets.mutable("Step Into")
 
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            val (propName, propSchema) = projectPathProperty()
-            put(propName, propSchema)
-            val (sessionName, sessionSchema) = sessionIdProperty()
-            put(sessionName, sessionSchema)
-        }
-        put("required", buildJsonArray { })
-        put("additionalProperties", false)
-    }
+    override val action = "step_into"
+    override val successMessage = "Stepped into"
+    override val newState = "running" // Will pause again after step completes
+    override val failurePrefix = "Failed to step into"
 
-    override suspend fun doExecute(project: Project, arguments: JsonObject): ToolCallResult {
-        val sessionId = arguments["session_id"]?.jsonPrimitive?.content
+    override fun checkPauseState(session: XDebugSession): String? =
+        if (!session.isPaused) "Session must be paused to step into" else null
 
-        val session = resolveSession(project, sessionId)
-            ?: return createErrorResult(
-                if (sessionId != null) "Session not found: $sessionId"
-                else "No active debug session"
-            )
-
-        if (!session.isPaused) {
-            return createErrorResult("Session must be paused to step into")
-        }
-
-        return try {
-            // stepInto must be called from EDT
-            ApplicationManager.getApplication().invokeAndWait {
-                session.stepInto()
-            }
-            createJsonResult(ExecutionControlResult(
-                sessionId = getSessionId(session),
-                action = "step_into",
-                status = "success",
-                message = "Stepped into",
-                newState = "running" // Will pause again after step completes
-            ))
-        } catch (e: Exception) {
-            createErrorResult("Failed to step into: ${e.message}")
-        }
-    }
+    override fun performAction(session: XDebugSession) = session.stepInto()
 }
