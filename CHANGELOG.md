@@ -4,7 +4,10 @@
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-08-03
+
 ### Breaking
+
 - **Requires IntelliJ Platform 2025.2 or newer** (was 2025.1). The MCP SDK cannot be linked on 2025.1: it reaches `kotlin.time.Clock`, which that platform's bundled Kotlin standard library does not ship, and its Ktor version needs a coroutines API that 2025.1 does not have either.
 - **`initialize` now negotiates the protocol version** instead of reporting a fixed one per transport. A client that asks for `2024-11-05` is answered in `2024-11-05`; previously the streamable endpoint always claimed `2025-03-26` and the legacy endpoint always claimed `2024-11-05`, whatever the client requested.
 - **The server description moved from `serverInfo.description` to `instructions`.** `description` was never part of the MCP specification; `instructions` is where the spec carries this text.
@@ -18,10 +21,12 @@
 - `Accept` and `Content-Type` remain advisory on the POST endpoints, as before: the SDK's strict header validation is relaxed at the edge so `curl`-style requests (wildcard `Accept`, implicit `Content-Type`) keep working.
 
 ### Changed
+
 - **The hand-rolled MCP protocol layer has been replaced by the official [MCP Kotlin SDK](https://github.com/modelcontextprotocol/kotlin-sdk).** JSON-RPC framing, `initialize`, capability and version negotiation, `ping`, session lifecycle, batching and all three transports are now the SDK's. About 1,200 lines of protocol code were deleted. Endpoint URLs, the 23 tool names, parameters, descriptions and result shapes, and the `isError` error contract are unchanged (the one schema-level change is `additionalProperties`, above), so existing client configuration keeps working.
 - The plugin no longer bundles a Ktor HTTP *client*, which removes a latent `NoSuchMethodError` that shipped in previous releases.
 
 ### Added
+
 - **Breakpoint `condition` and `log_message` expressions now pass through the Evaluate Expression safety guard.** Previously they were handed to the debugger unchecked, so a blocked operation could be smuggled past Read-only mode as a breakpoint condition.
 - `wait_for_pause`, `get_debug_session_status`: `stackSummary` now honours `max_stack_frames` with real frames, `totalStackDepth` is the real reported depth, `currentThread` is the actual thread name (was hardcoded `main`), and `threadCount` is the real thread count (was hardcoded 1).
 - Tool arguments are validated at the boundary: a wrong type (`line: "42"`), an out-of-range value (`frame_index: -1`) or an unknown enum value (`suspend_policy: "banana"`) now returns a clear typed error instead of being silently coerced, defaulted, or surfacing a raw exception.
@@ -29,6 +34,7 @@
 - `SECURITY.md` (honest threat model) and `CONTRIBUTING.md`.
 
 ### Fixed
+
 - Stack-frame `presentation` strings no longer disagree with the `line` field by one: they are now built from the same source position as the machine-readable fields instead of the platform's internal `toString()`, which encodes a 0-based line (live-QA finding 4.1).
 - A `suspend_policy: "none"` tracepoint is never reported as `breakpointHit` — it logs without suspending, so it cannot be the cause of a pause. Stepping onto a tracepoint's line previously misattributed the pause to it (live-QA finding 4.2).
 - Tools called without a `session_id` now fall back to the only live session when the IDE has no "current" one. A session that is running and has never paused is not "current", so `pause_execution` against it answered `No active debug session` even with exactly one session running (live-QA §5).
@@ -42,7 +48,6 @@
 - The MCP server binds its port when the IDE finishes starting up, not when anything first touches the service — opening the tool window or settings no longer starts the server as a side effect, and the "server started" notification appears once per IDE session instead of on every project open.
 - The version reported to MCP clients is read from the installed plugin descriptor at runtime, so it can never drift from the shipped version again.
 - The tool window releases its listeners when closed (it previously leaked the project through an unregistered disposable).
-
 
 ## [4.4.0] - 2026-08-01
 
@@ -255,7 +260,8 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.4.0...HEAD
+[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.4.0...v5.0.0
 [4.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.3.1...v4.4.0
 [4.3.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.3.0...v4.3.1
 [4.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.2.0...v4.3.0
