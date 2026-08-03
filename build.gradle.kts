@@ -242,6 +242,14 @@ tasks {
         dependsOn(patchChangelog)
     }
 
+    // verifyPluginSignature reads signPlugin's *-signed.zip. The IntelliJ Platform plugin wires
+    // that input path but not the task dependency, which Gradle 9 rejects as an implicit
+    // dependency the moment both run in one invocation (`./gradlew signPlugin verifyPluginSignature`
+    // in release.yml). Declaring it is exactly the fix Gradle's own error message recommends.
+    verifyPluginSignature {
+        dependsOn(signPlugin)
+    }
+
     // verifyPluginProjectConfiguration catches sinceBuild/plugin.xml/toolchain mismatches in
     // seconds; without this wiring it runs in no CI task graph at all.
     check {
