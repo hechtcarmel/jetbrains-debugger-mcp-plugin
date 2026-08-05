@@ -1,8 +1,6 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.util.IdeProductInfo
-import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.util.messages.Topic
 
 object McpConstants {
@@ -39,24 +37,24 @@ object McpConstants {
     @JvmStatic
     fun getServerName(): String = IdeProductInfo.getServerName()
 
-    /**
-     * Fallback for [SERVER_VERSION] used when the plugin descriptor is not loaded (plain unit
-     * tests). Must match `pluginVersion` in gradle.properties — `McpConstantsTest` pins that.
-     */
-    const val FALLBACK_SERVER_VERSION = "5.0.0"
+    /** Last-resort value if the generated version resource is somehow absent. */
+    private const val FALLBACK_SERVER_VERSION = "0.0.0"
 
     /**
      * The version reported to MCP clients during `initialize`.
      *
-     * Read from the installed plugin descriptor at runtime, so it cannot drift from the version
-     * the plugin actually ships — the previous hardcoded constant drifted twice, once for four
-     * consecutive releases. The fallback only applies where the plugin is not loaded as a plugin
-     * (unit tests).
+     * Read from a resource generated at build time from `pluginVersion` (see
+     * `generateServerVersionResource` in build.gradle.kts), so it stays in lockstep with the
+     * shipped version with no manual step. It is deliberately NOT read from the plugin descriptor
+     * at runtime: that needs `PluginManagerCore.getPlugin`, an internal API the Plugin Verifier
+     * rejects. The previous hardcoded constant drifted twice, once for four consecutive releases.
      */
     @JvmStatic
     val SERVER_VERSION: String by lazy {
-        runCatching { PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))?.version }
-            .getOrNull() ?: FALLBACK_SERVER_VERSION
+        McpConstants::class.java.getResourceAsStream("/META-INF/mcp-server-version.txt")
+            ?.bufferedReader()?.use { it.readText().trim() }
+            ?.takeIf { it.isNotEmpty() }
+            ?: FALLBACK_SERVER_VERSION
     }
     const val SERVER_DESCRIPTION = """Debug applications running in JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.) through programmatic control.
 

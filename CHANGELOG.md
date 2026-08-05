@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- Cleared the JetBrains Plugin Verifier problems that blocked Marketplace validation of 5.0.0:
+  - **Internal API**: the version reported to MCP clients was read via `PluginManagerCore.getPlugin` (an internal API). It is now generated into a bundled resource from `pluginVersion` at build time and read via the classloader — same no-drift guarantee, no internal API.
+  - **Override-only violations**: the tool-window buttons invoked `AnAction.actionPerformed` directly (marked `@ApiStatus.OverrideOnly`). They now dispatch through `ActionUtil.invokeAction`, which also removes the deprecated `AnActionEvent.createFromAnAction`.
+  - **Scheduled-for-removal APIs**: `XBreakpointManager.findBreakpointAtLine` replaced with `findBreakpointsAtLine`; `ProcessAdapter` replaced with `ProcessListener`; the deprecated `FileSaverDescriptor` constructor replaced with the `withExtensionFilter` builder.
+
 ## [5.0.0] - 2026-08-03
 
 ### Breaking
