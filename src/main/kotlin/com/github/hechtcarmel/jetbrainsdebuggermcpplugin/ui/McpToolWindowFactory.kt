@@ -8,8 +8,8 @@ import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -21,6 +21,7 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
+import java.awt.Component
 import java.awt.Cursor
 import java.awt.FlowLayout
 import java.awt.Font
@@ -77,21 +78,7 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
             icon = McpIcons.ToolWindow
             toolTipText = "Copy MCP client configuration to clipboard"
             isFocusable = false
-            addActionListener {
-                val dataContext = com.intellij.openapi.actionSystem.DataContext { dataId ->
-                    when (dataId) {
-                        com.intellij.openapi.actionSystem.CommonDataKeys.PROJECT.name -> project
-                        else -> null
-                    }
-                }
-                val event = AnActionEvent.createFromAnAction(
-                    installAction,
-                    null,
-                    ActionPlaces.TOOLWINDOW_CONTENT,
-                    dataContext
-                )
-                installAction.actionPerformed(event)
-            }
+            addActionListener { e -> fireToolbarAction(installAction, e.source as Component) }
         }
 
         val skillAction = action(INSTALL_SKILL_ACTION_ID)
@@ -99,21 +86,7 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
             icon = AllIcons.Actions.Download
             toolTipText = "Install or export the companion skill for AI coding agents"
             isFocusable = false
-            addActionListener {
-                val dataContext = com.intellij.openapi.actionSystem.DataContext { dataId ->
-                    when (dataId) {
-                        com.intellij.openapi.actionSystem.CommonDataKeys.PROJECT.name -> project
-                        else -> null
-                    }
-                }
-                val event = AnActionEvent.createFromAnAction(
-                    skillAction,
-                    null,
-                    ActionPlaces.TOOLWINDOW_CONTENT,
-                    dataContext
-                )
-                skillAction.actionPerformed(event)
-            }
+            addActionListener { e -> fireToolbarAction(skillAction, e.source as Component) }
         }
 
         // Right panel with external links + install button
@@ -176,6 +149,18 @@ class McpToolWindowFactory : ToolWindowFactory, DumbAware {
     }
 
     override fun shouldBeAvailable(project: Project): Boolean = true
+
+    /**
+     * Fires a registered action from a plain Swing button.
+     *
+     * `AnAction.actionPerformed` is `@ApiStatus.OverrideOnly` — it must not be invoked directly.
+     * `ActionUtil.invokeAction` is the sanctioned entry point: it builds the data context from the
+     * source component (so the action still sees the project) and runs the action through the
+     * platform's own dispatch. This also avoids the deprecated `AnActionEvent.createFromAnAction`.
+     */
+    private fun fireToolbarAction(action: AnAction, source: Component) {
+        ActionUtil.invokeAction(action, source, ActionPlaces.TOOLWINDOW_CONTENT, null, null)
+    }
 
     /**
      * Creates a settings panel with an icon and descriptive text.

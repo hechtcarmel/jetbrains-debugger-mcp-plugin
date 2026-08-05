@@ -23,6 +23,27 @@ kotlin {
     jvmToolchain(21)
 }
 
+// The version reported to MCP clients (McpConstants.SERVER_VERSION) is generated into a bundled
+// resource at build time and read back via the classloader — NOT from the plugin descriptor at
+// runtime. Reading the descriptor would mean PluginManagerCore.getPlugin(), which the JetBrains
+// Plugin Verifier flags as internal-API usage. This keeps the version in lockstep with
+// `pluginVersion` with no manual step and no internal API.
+val generateServerVersionResource by tasks.registering {
+    val pluginVersion = providers.gradleProperty("pluginVersion")
+    val outputDir = layout.buildDirectory.dir("generated/server-version")
+    inputs.property("pluginVersion", pluginVersion)
+    outputs.dir(outputDir)
+    doLast {
+        outputDir.get().file("META-INF/mcp-server-version.txt").asFile.apply {
+            parentFile.mkdirs()
+            writeText(pluginVersion.get())
+        }
+    }
+}
+sourceSets.main {
+    resources.srcDir(generateServerVersionResource)
+}
+
 // Configure project's dependencies
 repositories {
     mavenCentral()

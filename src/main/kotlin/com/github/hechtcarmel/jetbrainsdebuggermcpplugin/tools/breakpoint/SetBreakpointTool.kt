@@ -242,7 +242,7 @@ class SetBreakpointTool : AbstractMcpTool() {
         temporary: Boolean
     ): XLineBreakpoint<*> {
         val lineType = type as XLineBreakpointType<XBreakpointProperties<*>>
-        return breakpointManager.findBreakpointAtLine(lineType, virtualFile, lineIndex)
+        return breakpointManager.findBreakpointsAtLine(lineType, virtualFile, lineIndex).firstOrNull()
             ?: breakpointManager.addLineBreakpoint(
                 lineType,
                 virtualFile.url,

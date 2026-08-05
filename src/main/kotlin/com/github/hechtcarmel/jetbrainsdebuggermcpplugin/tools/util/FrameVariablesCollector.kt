@@ -108,6 +108,8 @@ object FrameVariablesCollector {
                         link: XDebuggerTreeNodeHyperlink?
                     ) {}
 
+                    // Still an abstract member of XCompositeNode even though deprecated, so it must
+                    // be implemented; the real behaviour lives in the two-arg overload below.
                     @Deprecated("Deprecated in Java")
                     override fun tooManyChildren(remaining: Int) {}
 

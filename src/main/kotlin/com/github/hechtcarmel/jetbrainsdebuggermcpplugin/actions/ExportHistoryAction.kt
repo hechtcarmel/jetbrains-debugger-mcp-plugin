@@ -20,11 +20,10 @@ class ExportHistoryAction : AnAction(
         val project = e.project ?: return
         val historyService = CommandHistoryService.getInstance(project)
 
-        val descriptor = FileSaverDescriptor(
-            "Export Command History",
-            "Save command history to file",
-            "json", "csv"
-        )
+        // withExtensionFilter returns the parent FileChooserDescriptor type, so mutate in an
+        // apply block and keep the FileSaverDescriptor-typed reference the save dialog needs.
+        val descriptor = FileSaverDescriptor("Export Command History", "Save command history to file")
+            .apply { withExtensionFilter("Command history", "json", "csv") }
 
         val dialog = FileChooserFactory.getInstance().createSaveFileDialog(descriptor, project)
         val wrapper = dialog.save(null as VirtualFile?, "debugger-mcp-history")
