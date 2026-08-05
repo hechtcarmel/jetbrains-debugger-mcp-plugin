@@ -2,9 +2,10 @@
 # https://www.jetbrains.com/help/qodana/qodana-yaml.html
 
 version: "1.0"
-# Native mode tracking the qodana-action version. The previous `linter:` image pin
-# (jetbrains/qodana-jvm-community:2024.3) had skewed a full year behind the action.
-ide: QDJVMC
+# Docker linter (not native `ide:`): the container bundles a JDK and wires Gradle to it, so the
+# project imports cleanly. Native `ide: QDJVMC` crashed with "Invalid Gradle JDK configuration"
+# because it relied on a host Gradle JVM setup that does not exist on the runner.
+linter: jetbrains/qodana-jvm-community:2025.2
 projectJDK: "21"
 profile:
   name: qodana.recommended
