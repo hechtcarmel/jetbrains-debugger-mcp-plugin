@@ -183,9 +183,11 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            // CI drives per-IDE verification legs with -PverifyIdeType=IC|PY|WS|GO (see build.yml's
-            // `verify` matrix); local runs without the property keep recommended() (IC only, because
-            // recommended() derives its product type solely from `platformType`).
+            // CI verifies IC (build.yml's `verify` job passes -PverifyIdeType=IC). The property
+            // also accepts PY|WS|GO for a manual local check, though those families surface
+            // false-positive Java-PSI problems from the reflectively-loaded Java analyzer. A run
+            // without the property keeps recommended() (IC only, since recommended() derives its
+            // product type from `platformType`).
             val requested = providers.gradleProperty("verifyIdeType").orNull
             if (requested.isNullOrBlank()) {
                 recommended()
