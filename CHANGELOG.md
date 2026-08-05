@@ -4,7 +4,10 @@
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-08-05
+
 ### Fixed
+
 - Cleared the JetBrains Plugin Verifier problems that blocked Marketplace validation of 5.0.0:
   - **Internal API**: the version reported to MCP clients was read via `PluginManagerCore.getPlugin` (an internal API). It is now generated into a bundled resource from `pluginVersion` at build time and read via the classloader — same no-drift guarantee, no internal API.
   - **Override-only violations**: the tool-window buttons invoked `AnAction.actionPerformed` directly (marked `@ApiStatus.OverrideOnly`). They now dispatch through `ActionUtil.invokeAction`, which also removes the deprecated `AnActionEvent.createFromAnAction`.
@@ -266,7 +269,8 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.0...HEAD
+[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.1...HEAD
+[5.0.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.4.0...v5.0.0
 [4.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.3.1...v4.4.0
 [4.3.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.3.0...v4.3.1
