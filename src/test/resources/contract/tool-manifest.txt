@@ -1,7 +1,7 @@
 # MCP tool manifest — golden snapshot
 # Snapshot of the SDK Tool as serialized to clients, not of the authored schema.
 # Regenerate: ./gradlew test --tests "*ToolManifestContractTest" -Dcontract.update=true
-# tools: 23
+# tools: 24
 
 ## evaluate_expression
 description:
@@ -1130,6 +1130,134 @@ inputSchema:
   }
 outputSchema:
   <none>
+
+## trace_execution
+description:
+  Runs a run configuration under the debugger, stopping at each probe to record the listed
+  expressions, and returns the whole transcript in ONE call.
+  Prefer this over set_breakpoint + wait_for_pause + resume_execution loops whenever you
+  already know which expressions you want to watch: it costs a single round trip instead of
+  one per stop.
+  Each probe declares a file, a 1-based line, the expressions to record there, and how many
+  hits to record before the trace stops waiting for it.
+  Breakpoints created by this tool are always removed afterwards, including on failure.
+  Note: probes suspend execution, so this perturbs timing the same way a breakpoint does —
+  for race conditions use a logpoint instead (set_breakpoint with log_message and
+  suspend_policy 'none').
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Trace Execution"
+  }
+inputSchema:
+  {
+    "properties": {
+      "configuration_name": {
+        "description": "Name of the run configuration to debug. Call list_run_configurations to discover it.",
+        "type": "string"
+      },
+      "probes": {
+        "description": "Where to stop and what to record there. At least one is required.",
+        "items": {
+          "properties": {
+            "expressions": {
+              "description": "Expressions to evaluate at this probe, in the target language.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "file_path": {
+              "description": "Absolute path to the file.",
+              "type": "string"
+            },
+            "line": {
+              "description": "1-based line number.",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "max_hits": {
+              "description": "How many hits to record for this probe before it stops being waited for. Default 1.",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "file_path",
+            "line",
+            "expressions"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "timeout": {
+        "description": "Maximum seconds for the whole trace. Default 120.",
+        "minimum": 1,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "configuration_name",
+      "probes"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  {
+    "properties": {
+      "hits": {
+        "items": {
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "hit": {
+              "type": "integer"
+            },
+            "line": {
+              "type": "integer"
+            },
+            "presentation": {
+              "type": "string"
+            },
+            "values": {
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "message": {
+        "type": "string"
+      },
+      "probesNeverHit": {
+        "description": "Probes that never fired, so an empty transcript is distinguishable from a mis-placed probe",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "status": {
+        "description": "'completed' when every probe met its budget, 'finished' when the process exited first, 'timeout' otherwise",
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "message",
+      "hits"
+    ],
+    "type": "object"
+  }
 
 ## wait_for_pause
 description:
