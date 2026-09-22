@@ -1,11 +1,14 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util
 
+import com.intellij.ui.ColoredTextContainer
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.swing.Icon
 import kotlin.coroutines.resume
 
 /**
@@ -13,24 +16,66 @@ import kotlin.coroutines.resume
  */
 object StackFrameUtils {
 
+    /**
+     * What XStackFrame's own default rendering produces. It carries no information, and letting
+     * it through would put "<invalid frame>" into presentations that used to read `file:line`.
+     */
+    private const val PLACEHOLDER_LABEL = "<invalid frame>"
+
     private val CLASS_NAME_REGEX = Regex("""([a-zA-Z_][\w.]*)\.[a-zA-Z_]\w*\(""")
     private val METHOD_NAME_REGEX = Regex("""\.([a-zA-Z_]\w*)\(""")
 
     /**
-     * Extracts the class name from a stack frame's string representation.
+     * The label the IDE's Frames panel shows for this frame.
+     *
+     * `XStackFrame.toString()` is not a contract. Some debuggers happen to return something
+     * like `com.example.Foo.bar(Foo.java:10)`, which the regexes below can parse; others
+     * inherit the default and return an identity hash — Delve frames arrive as
+     * `com.goide.dlv.DlvStackFrame@6a38cd63`. Parsing that yields null for both the class and
+     * the method and a bare `file:line` presentation, so a Go, Rust or Python stack loses the
+     * one thing a caller actually wants: the function name.
+     *
+     * `customizePresentation` is how the panel itself renders a frame, so it is the same text
+     * for every language. Returns null when a frame renders nothing, leaving callers on their
+     * existing fallbacks.
+     */
+    fun renderLabel(frame: XStackFrame): String? {
+        val builder = StringBuilder()
+        val collector = object : ColoredTextContainer {
+            override fun append(fragment: String, attributes: SimpleTextAttributes) {
+                builder.append(fragment)
+            }
+
+            override fun append(fragment: String, attributes: SimpleTextAttributes, tag: Any?) {
+                builder.append(fragment)
+            }
+
+            override fun setIcon(icon: Icon?) = Unit
+
+            override fun setToolTipText(text: String?) = Unit
+        }
+        // A frame is free to throw while rendering; a label is never worth failing a tool call.
+        runCatching { frame.customizePresentation(collector) }
+        return builder.toString().trim()
+            .takeIf { it.isNotEmpty() && it != PLACEHOLDER_LABEL }
+    }
+
+    /** Text the name regexes run against: what the IDE renders, or toString() if it renders nothing. */
+    private fun parseableText(frame: XStackFrame): String = renderLabel(frame) ?: frame.toString()
+
+    /**
+     * Extracts the class name from a stack frame's rendered presentation.
      */
     fun extractClassName(frame: XStackFrame): String? {
-        val presentation = frame.toString()
-        val match = CLASS_NAME_REGEX.find(presentation)
+        val match = CLASS_NAME_REGEX.find(parseableText(frame))
         return match?.groupValues?.get(1)
     }
 
     /**
-     * Extracts the method name from a stack frame's string representation.
+     * Extracts the method name from a stack frame's rendered presentation.
      */
     fun extractMethodName(frame: XStackFrame): String? {
-        val presentation = frame.toString()
-        val match = METHOD_NAME_REGEX.find(presentation)
+        val match = METHOD_NAME_REGEX.find(parseableText(frame))
         return match?.groupValues?.get(1)
     }
 
@@ -44,15 +89,29 @@ object StackFrameUtils {
      * line to disagree with.
      */
     fun formatPresentation(frame: XStackFrame): String {
-        val position = frame.sourcePosition ?: return frame.toString()
+        val position = frame.sourcePosition ?: return renderLabel(frame) ?: frame.toString()
         val location = "${position.file.name}:${position.line + 1}"
         val className = extractClassName(frame)?.substringAfterLast('.')
         val methodName = extractMethodName(frame)
-        return if (className != null && methodName != null) {
-            "$className.$methodName($location)"
-        } else {
-            location
+        if (className != null && methodName != null) {
+            return "$className.$methodName($location)"
         }
+        // Languages whose frames do not render in `Class.method(...)` shape still have a
+        // useful label; falling straight through to `file:line` threw away the function name.
+        return combineLabelAndLocation(renderLabel(frame), location)
+    }
+
+    /**
+     * Joins a rendered label with the frame's location without repeating the location.
+     *
+     * Most non-JVM labels already carry it - Delve renders "pkg.Func (file.go:12) module" -
+     * so appending it unconditionally produced "... module (file.go:12)", which reads like
+     * two frames run together.
+     */
+    internal fun combineLabelAndLocation(label: String?, location: String): String = when {
+        label.isNullOrBlank() -> location
+        label.contains(location) -> label
+        else -> "$label ($location)"
     }
 
     /**
