@@ -6,7 +6,8 @@ description: >-
   start_debug_session, stop_debug_session, get_debug_session_status, list_debug_sessions,
   set_breakpoint, remove_breakpoint, list_breakpoints, resume_execution, pause_execution,
   step_over, step_into, step_out, run_to_line, wait_for_pause, get_stack_trace, select_stack_frame,
-  list_threads, get_variables, set_variable, get_source_context, evaluate_expression.
+  list_threads, get_variables, set_variable, get_source_context, evaluate_expression,
+  trace_execution.
   Use when debugging any application, investigating bugs, tracing execution flow, inspecting
   runtime state, or when the user says "debug", "breakpoint", "step through", "inspect variable",
   "why is this returning X", "trace execution", or similar debugging-related requests.

@@ -42,6 +42,7 @@ class SafetyGuardCoverageTest {
             "evaluation/EvaluateTool.kt",
             "variable/SetVariableTool.kt",
             "breakpoint/SetBreakpointTool.kt",
+            "trace/TraceExecutionTool.kt",
         )
     }
 

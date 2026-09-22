@@ -345,3 +345,33 @@ In `Default blocklist` and `Read-only`, expressions containing **interpolated st
 - Variable inspection works
 - Method calls (e.g., `s.len()`, `vec.size()`) may fail
 - Use `get_variables` as an alternative
+
+## Tracing
+
+### `trace_execution`
+
+Runs a run configuration under the debugger, stopping at each probe to record the listed
+expressions, and returns the whole transcript in **one** call.
+
+Prefer it over `set_breakpoint` + `wait_for_pause` + `resume_execution` loops whenever the
+expressions to watch are already known: six stops cost one call here and roughly a dozen there.
+Use the interactive tools instead when you do not yet know what to look at.
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `configuration_name` | string | **Yes** | | Run configuration to debug |
+| `probes` | array | **Yes** | | Each: `file_path`, `line` (1-based), `expressions` (array), `max_hits` (default `1`) |
+| `timeout` | integer | No | `120` | Seconds for the whole trace |
+| `project_path` | string | No | | Project path |
+
+**Requires:** No running session for that configuration; the tool starts and stops its own.
+
+**Returns:** `status` (`completed` / `finished` / `timeout`), `message`, `hits` (each with `hit`,
+`file`, `line`, `presentation`, `values`), `probesNeverHit`.
+
+**Safety settings:** probe expressions go through the same Evaluate Expression safety mode as
+`evaluate_expression`, and are checked before anything is launched.
+
+**Not for race conditions:** probes suspend execution, so they perturb timing the way any
+breakpoint does. To observe a race without disturbing it, use `set_breakpoint` with
+`log_message` and `suspend_policy: "none"`.

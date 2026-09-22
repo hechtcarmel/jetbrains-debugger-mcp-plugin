@@ -4,6 +4,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolRegistry
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.DebugSessionStatus
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StackTraceResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.VariablesResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.TraceExecutionResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.WaitForPauseResult
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -41,6 +42,7 @@ class OutputSchemaFidelityTest {
             "get_stack_trace" to serializer<StackTraceResult>().descriptor,
             "get_debug_session_status" to serializer<DebugSessionStatus>().descriptor,
             "wait_for_pause" to serializer<WaitForPauseResult>().descriptor,
+            "trace_execution" to serializer<TraceExecutionResult>().descriptor,
         )
     }
 

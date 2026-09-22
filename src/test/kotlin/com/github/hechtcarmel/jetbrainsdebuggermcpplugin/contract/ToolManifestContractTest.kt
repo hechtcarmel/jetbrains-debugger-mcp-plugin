@@ -44,6 +44,7 @@ class ToolManifestContractTest {
          */
         val EXPECTED_TOOL_NAMES = setOf(
             "evaluate_expression",
+        "trace_execution",
             "execute_run_configuration",
             "get_debug_session_status",
             "get_source_context",

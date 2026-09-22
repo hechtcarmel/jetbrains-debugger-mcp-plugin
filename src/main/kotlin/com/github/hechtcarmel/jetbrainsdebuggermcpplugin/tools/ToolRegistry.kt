@@ -24,6 +24,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack.SelectStack
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.variable.GetVariablesTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.variable.SetVariableTool
 import java.util.concurrent.ConcurrentHashMap
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.trace.TraceExecutionTool
 
 class ToolRegistry {
     private val tools = ConcurrentHashMap<String, McpTool>()
@@ -87,5 +88,8 @@ class ToolRegistry {
 
         // Evaluation Tools
         register(EvaluateTool())
+
+        // Trace
+        register(TraceExecutionTool())
     }
 }
