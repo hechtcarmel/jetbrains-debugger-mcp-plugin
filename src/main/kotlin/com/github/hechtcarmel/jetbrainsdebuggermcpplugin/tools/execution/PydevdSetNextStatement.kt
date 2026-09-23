@@ -74,7 +74,7 @@ internal class PydevdSetNextStatement private constructor(
             }
         }
 
-        ApplicationManager.getApplication().executeOnPooledThread(Runnable {
+        ApplicationManager.getApplication().executeOnPooledThread {
             try {
                 method.invoke(process, context, target, callback)
             } catch (e: InvocationTargetException) {
@@ -86,7 +86,7 @@ internal class PydevdSetNextStatement private constructor(
                 // pooled thread, so there is no cancellation to propagate — only a reply to complete.
                 reply.complete(Reply.Failed(describe(e)))
             }
-        })
+        }
 
         return withTimeoutOrNull(timeoutMs) { reply.await() } ?: Reply.NoReply
     }
@@ -130,7 +130,7 @@ internal class PydevdSetNextStatement private constructor(
         internal fun parseReply(value: Any?): Reply {
             val pair = value as? com.intellij.openapi.util.Pair<*, *>
                 ?: return Reply.Failed("unexpected reply from the debugger: $value")
-            if (pair.first == true) return Reply.Accepted
+            if ((pair.first as? Boolean) == true) return Reply.Accepted
             val reason = (pair.second as? String).orEmpty()
                 .trim()
                 .removePrefix("Error")
