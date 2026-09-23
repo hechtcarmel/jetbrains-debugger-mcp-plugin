@@ -19,6 +19,7 @@ import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.common.ThreadLeakTracker
 import com.intellij.testFramework.fixtures.JavaCodeInsightFixtureTestCase
@@ -324,6 +325,7 @@ class LivePythonDebugSessionTest : JavaCodeInsightFixtureTestCase() {
      * configuration's validity check.
      */
     private fun registerPythonSdk(): Sdk {
+        allowPythonInstallAccess()
         val created = ProjectJdkTable.getInstance().createSdk("mcp-live-python", PythonSdkType.getInstance())
         val modificator = created.sdkModificator
         modificator.homePath = python
@@ -333,6 +335,20 @@ class LivePythonDebugSessionTest : JavaCodeInsightFixtureTestCase() {
         WriteAction.run<Throwable> { ProjectJdkTable.getInstance().addJdk(created) }
         sdk = created
         return created
+    }
+
+    /**
+     * Platform tests may only touch whitelisted directories, and PyCharm's flavor detection looks
+     * around the interpreter's installation (e.g. for `conda-meta`). Allow its prefix — `<prefix>/bin/python`
+     * — both as given and with symlinks resolved, for this test only.
+     */
+    private fun allowPythonInstallAccess() {
+        val executable = Path.of(python)
+        val prefixes = listOf(executable, executable.toRealPath())
+            .mapNotNull { it.parent?.parent ?: it.parent }
+            .map { it.toString() }
+            .distinct()
+        VfsRootAccess.allowRootAccess(testRootDisposable, *prefixes.toTypedArray())
     }
 
     private fun registerPythonConfiguration(scriptPath: String, sdk: Sdk): String {
