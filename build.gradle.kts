@@ -107,6 +107,11 @@ dependencies {
         // Module Dependencies. Uses `platformBundledModules` property from the gradle.properties file for bundled IntelliJ Platform modules.
         bundledModules(providers.gradleProperty("platformBundledModules").map { it.split(',') })
 
+        // Test-only plugins (see gradle.properties) — the live pydevd suite needs the Python plugin, production
+        // code must not: jump_to_line reaches the Python debugger reflectively.
+        testPlugins(providers.gradleProperty("platformTestPlugins").map { it.split(',') })
+        testBundledPlugins(providers.gradleProperty("platformTestBundledPlugins").map { it.split(',') })
+
         testFramework(TestFrameworkType.Platform)
         // Java-plugin test support (JavaCodeInsightFixtureTestCase, IdeaTestUtil, …) — required by
         // the live-debuggee suite under src/test/…/livedebug, which needs a heavy Java project

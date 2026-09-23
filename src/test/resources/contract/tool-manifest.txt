@@ -596,7 +596,7 @@ description:
   Moves the paused execution point to another line WITHOUT running the code in between (also known as Set Next Statement, Jump to Cursor, or Set Execution Point). Unlike run_to_line, skipped lines never execute, and jumping to an earlier line executes it again. The session stays paused at the new line.
   Use to retry a block after fixing a value with set_variable, or to skip a call that crashes or has side effects, without restarting the session.
   Works only inside the current function of the paused thread (its top stack frame, regardless of select_stack_frame), and only where the debugger supports it: currently Python sessions on the pydevd debugger backend. Other debuggers, including Java/Kotlin and Python's debugpy backend, return an error.
-  Skipped code leaves variables stale or unassigned, jumping back re-runs side effects, and skipped 'finally' blocks or 'with' exits do not run. Python refuses jumps into a 'for' loop body or an 'except' block.
+  Skipped code leaves variables stale or unassigned (Python 3.12+ sets unassigned locals to None), jumping back re-runs side effects, and skipped 'finally' blocks or 'with' exits do not run. Python refuses jumps into a 'for' loop body or an 'except' block, and a thread stopped right after step_out or a step past a 'return' must step once more before it can jump. A target line without code (blank or comment) lands on the next line that has code.
 annotations:
   {
     "destructiveHint": true,

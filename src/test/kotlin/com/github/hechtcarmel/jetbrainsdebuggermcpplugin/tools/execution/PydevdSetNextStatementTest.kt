@@ -105,11 +105,16 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
             Reply.Refused("jump is available only within the bottom frame"),
             request(ReplyingProcess { it.ok(Pair(false, "Error: jump is available only within the bottom frame")) })
         )
+        assertEquals(
+            Reply.Refused("can't jump into an 'except' block as there's no exception"),
+            request(ReplyingProcess { it.ok(Pair(false, "Error: can't jump into an 'except' block as there's no exception")) })
+        )
     }
 
-    fun `test a refusal without a reason still explains itself`() {
+    fun `test a refusal without a reason explains that the thread is not at a line start`() {
+        // pydevd answers a bare False when the thread did not stop on a 'line' event, e.g. after step_out.
         assertEquals(
-            Reply.Refused("the debugger refused the jump without giving a reason"),
+            Reply.Refused(PydevdSetNextStatement.NOT_AT_LINE_START_REASON),
             request(ReplyingProcess { it.ok(Pair(false, "Error")) })
         )
     }

@@ -42,7 +42,7 @@ class JumpToLineTool : AbstractMcpTool() {
         Moves the paused execution point to another line WITHOUT running the code in between (also known as Set Next Statement, Jump to Cursor, or Set Execution Point). Unlike run_to_line, skipped lines never execute, and jumping to an earlier line executes it again. The session stays paused at the new line.
         Use to retry a block after fixing a value with set_variable, or to skip a call that crashes or has side effects, without restarting the session.
         Works only inside the current function of the paused thread (its top stack frame, regardless of select_stack_frame), and only where the debugger supports it: currently Python sessions on the pydevd debugger backend. Other debuggers, including Java/Kotlin and Python's debugpy backend, return an error.
-        Skipped code leaves variables stale or unassigned, jumping back re-runs side effects, and skipped 'finally' blocks or 'with' exits do not run. Python refuses jumps into a 'for' loop body or an 'except' block.
+        Skipped code leaves variables stale or unassigned (Python 3.12+ sets unassigned locals to None), jumping back re-runs side effects, and skipped 'finally' blocks or 'with' exits do not run. Python refuses jumps into a 'for' loop body or an 'except' block, and a thread stopped right after step_out or a step past a 'return' must step once more before it can jump. A target line without code (blank or comment) lands on the next line that has code.
     """.trimIndent()
 
     override val annotations = ToolAnnotationPresets.mutable("Jump to Line", destructive = true)
@@ -106,8 +106,8 @@ class JumpToLineTool : AbstractMcpTool() {
                 repositioned.complete(false)
             }
         }
-        // Registered before the request is sent: the pause that reports the new position can be
-        // delivered before the request's own reply has been handed back.
+        // Registered before the request is sent: pydevd re-suspends the thread within milliseconds of
+        // answering, so the pause can land before this coroutine has even read the answer.
         session.addSessionListener(listener)
         try {
             when (val reply = setNextStatement.request(session.suspendContext, target, REPLY_TIMEOUT_MS)) {
@@ -118,7 +118,7 @@ class JumpToLineTool : AbstractMcpTool() {
                 PydevdSetNextStatement.Reply.NoReply ->
                     return createErrorResult(
                         "The debugger did not answer the jump request within ${REPLY_TIMEOUT_MS / 1000}s. " +
-                            "Execution was not moved; the thread may not be stopped at a line."
+                            "Check where execution is paused with get_debug_session_status before continuing."
                     )
                 PydevdSetNextStatement.Reply.Accepted -> Unit
             }
@@ -146,11 +146,18 @@ class JumpToLineTool : AbstractMcpTool() {
             !observed ->
                 "The debugger accepted the jump to $target but did not report the new position within " +
                     "${REPOSITION_TIMEOUT_MS / 1000}s. Call get_debug_session_status to confirm where execution is paused."
-            position != null && isSameFile(position.file, targetFile) && position.line == targetLine - 1 ->
+            position == null ->
+                "The debugger accepted the jump to $target but reports no current position. " +
+                    "Call get_debug_session_status to confirm where execution is paused."
+            isSameFile(position.file, targetFile) && position.line == targetLine - 1 ->
                 "Execution point moved to $target. The skipped lines did not run."
+            // CPython moves a jump onto a line without code (blank, comment) to the next line that has some.
+            isSameFile(position.file, targetFile) ->
+                "Execution point moved to ${position.file.path}:${position.line + 1}: line $targetLine has no code, " +
+                    "so the debugger used the next line that does. The skipped lines did not run."
             else ->
                 "The debugger accepted the jump to $target, but the session is now paused at " +
-                    "${position?.let { "${it.file.path}:${it.line + 1}" } ?: "an unknown position"}."
+                    "${position.file.path}:${position.line + 1}."
         }
     }
 

@@ -113,9 +113,20 @@ internal class PydevdSetNextStatement private constructor(
         }
 
         /**
+         * Why pydevd refuses without a message: it only moves a thread that stopped on a `line` event,
+         * and a thread paused right after `step_out`, after stepping past a `return`, or on a `def`
+         * line has not.
+         */
+        const val NOT_AT_LINE_START_REASON =
+            "the thread is not stopped at the start of a line (as after step_out or a step past a " +
+                "return); step_over once, then retry"
+
+        /**
          * Reads pydevd's reply: a `com.intellij.openapi.util.Pair<Boolean, String>` whose second half
          * is `"Error"` or `"Error: <reason>"` — also on success, so it only means something when the
-         * first half is false.
+         * first half is false. The reasons are CPython's jump rules ("can't jump into the body of a
+         * for loop", "line 67 comes after the current code block") or pydevd's own ("jump is
+         * available only within the bottom frame").
          */
         internal fun parseReply(value: Any?): Reply {
             val pair = value as? com.intellij.openapi.util.Pair<*, *>
@@ -126,7 +137,7 @@ internal class PydevdSetNextStatement private constructor(
                 .removePrefix("Error")
                 .removePrefix(":")
                 .trim()
-            return Reply.Refused(reason.ifEmpty { "the debugger refused the jump without giving a reason" })
+            return Reply.Refused(reason.ifEmpty { NOT_AT_LINE_START_REASON })
         }
 
         private fun describe(throwable: Throwable?): String =

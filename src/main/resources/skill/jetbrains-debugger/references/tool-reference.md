@@ -221,7 +221,7 @@ Move the paused execution point to another line **without running the code in be
 
 **Supported debuggers:** Python sessions on the pydevd backend. Any other debugger — Java/Kotlin (the JVM cannot move the execution point), JavaScript, PHP, Go, native, and Python's debugpy backend — returns an error naming the debugger.
 
-**Limits:** Only within the current function of the paused thread (its top frame, whatever `select_stack_frame` selected) and only in that file. Python refuses jumps into a `for` loop body or an `except` block, and reports why. Skipped code leaves variables stale or unassigned; skipped `finally` blocks and `with` exits do not run; jumping back re-runs side effects.
+**Limits:** Only within the current function of the paused thread (its top frame, whatever `select_stack_frame` selected) and only in that file. Python refuses jumps into a `for` loop body or an `except` block, and reports why. Right after `step_out` or a step past a `return` the thread is not at the start of a line and the jump is refused — `step_over` once, then retry. A blank or comment line lands on the next line with code. Skipped code leaves variables stale or unassigned (Python 3.12+ sets unassigned locals to `None`); skipped `finally` blocks and `with` exits do not run; jumping back re-runs side effects.
 
 ### `wait_for_pause`
 Wait for a debug session to pause (breakpoint hit, exception, or manual pause). Returns the full session status when paused, equivalent to calling `get_debug_session_status`. Use after `resume_execution`, `start_debug_session`, or any execution control tool to avoid manual polling.

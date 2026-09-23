@@ -227,6 +227,11 @@ These languages use native debuggers (LLDB/GDB) with some limitations:
 Run it before pushing. There is no separate "fast tier": the suite is small enough that splitting
 it would cost more than it saves.
 
+The live Python suite needs a CPython 3 interpreter: `MCP_LIVE_PYTHON=/path/to/python3`, or `python3`
+on the `PATH`. CI pins 3.12 with `actions/setup-python`. The Python plugin it drives (PythonCore) is a
+test-only dependency (`platformTestPlugins` in `gradle.properties`, pinned to the IDE build); keep it
+in step with `platformVersion`.
+
 ### How the suite is organised
 
 | Layer | Location | What it protects |
@@ -236,6 +241,7 @@ it would cost more than it saves.
 | **Transport conformance** | `server/transport/` | Every route, status code, header, Origin decision and SSE frame, over real HTTP |
 | **Tool behaviour** | `tools/**/*BehaviorTest` | What a tool actually does to IDE state |
 | **Live debuggee** | `livedebug/LiveDebugSessionTest` | The paused-state success paths against a real JVM: breakpoint hit, variables, evaluation, stepping, stack |
+| **Live Python debuggee** | `livedebug/LivePythonDebugSessionTest` | `jump_to_line` against a real pydevd session: backward, forward and in-function jumps, CPython's and pydevd's refusals, wrong file, not paused |
 | **Unit** | everything else | Pure logic — log-message transforms, safety analysis, value presentation |
 
 ### Golden contract files
@@ -279,15 +285,24 @@ Write fixture files to disk under `project.basePath`, not via `myFixture.addFile
 
 Stated plainly so nobody mistakes the suite for more than it is:
 
-- **One live debug session, one language, one scenario.** `livedebug/LiveDebugSessionTest`
+- **Two live debuggers, one scenario each.** `livedebug/LiveDebugSessionTest`
   compiles a small Java program, launches it suspended under JDWP, attaches through a `Remote`
   run configuration started by `start_debug_session`, and drives the success paths of
   `set_breakpoint`, `wait_for_pause` (including breakpoint attribution and the embedded
   variables), `get_variables`, `evaluate_expression`, `step_over`, `get_stack_trace` and
-  `stop_debug_session` against the genuinely paused JVM. Still uncovered live: `step_into`,
-  `step_out`, `run_to_line`, `pause_execution`, `resume_execution`, `set_variable`,
-  `list_threads`, `select_stack_frame`, `get_debug_session_status`, conditional/log breakpoints
-  actually firing, and every non-Java debugger.
+  `stop_debug_session` against the genuinely paused JVM, plus `jump_to_line`'s refusal there.
+  `livedebug/LivePythonDebugSessionTest` runs a Python script under pydevd through an ordinary
+  Python run configuration and covers `jump_to_line` end to end — on one CPython (3.12, where
+  PyCharm uses `sys.monitoring`), one thread, no `with`/`finally`/generator frames. Still uncovered
+  live: `step_into`, `step_out`, `run_to_line`, `pause_execution`, `set_variable`,
+  `list_threads`, `select_stack_frame`, conditional/log breakpoints actually firing, and every
+  debugger other than the JVM's and pydevd.
+- **`jump_to_line` works on pydevd only.** The platform has no language-agnostic
+  "set next statement" API, and the tool reaches `PyDebugProcess.startSetNextStatement`
+  reflectively. PyCharm's debugpy backend (the default for local Python 3.9+ interpreters since
+  2026.2), CLion/RustRover and Rider all have the feature in closed-source code and get an error
+  naming their debug process. The IDE computes the target's function name from PSI, so jumps
+  inside class bodies and generator expressions are refused even where CPython would allow them.
 - **`BreakpointHitInfo.hitCount` is always 0.** The language-agnostic `XBreakpoint` API exposes
   no hit-count accessor; hit counts live in language-specific debugger implementations.
 - **Pause-reason detection is a file/line heuristic.** It matches the top frame's position against

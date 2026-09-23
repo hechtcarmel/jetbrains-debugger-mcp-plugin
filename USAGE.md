@@ -927,7 +927,7 @@ Moves the paused execution point to another line **without running the code in b
 
 **Supported debuggers:** Python sessions on the pydevd backend. Other debuggers (Java/Kotlin, JavaScript, PHP, Go, native, Python's debugpy backend) return an error naming the debugger.
 
-**Limits:** Only within the current function of the paused thread (its top frame) and only in that file. Python refuses jumps into a `for` loop body or an `except` block. Skipped code leaves variables stale or unassigned, skipped `finally` blocks and `with` exits do not run, and jumping back re-runs side effects.
+**Limits:** Only within the current function of the paused thread (its top frame) and only in that file. Python refuses jumps into a `for` loop body or an `except` block. Right after `step_out` or a step past a `return` the thread is not at the start of a line, so the jump is refused until it steps once more. A blank or comment line lands on the next line with code. Skipped code leaves variables stale or unassigned (Python 3.12+ sets unassigned locals to `None`), skipped `finally` blocks and `with` exits do not run, and jumping back re-runs side effects.
 
 **Parameters:**
 
