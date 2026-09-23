@@ -307,7 +307,8 @@ Stated plainly so nobody mistakes the suite for more than it is:
   no hit-count accessor; hit counts live in language-specific debugger implementations.
 - **Pause-reason detection is a file/line heuristic.** It matches the top frame's position against
   enabled, unmuted line breakpoints, so it returns only `breakpoint` or `step`, never `exception`
-  or `pause`, though the output schema advertises all four.
+  or `pause`, though the output schema advertises all four. A `jump_to_line` onto a line that has
+  a breakpoint is therefore reported as that breakpoint being hit.
 - **`additionalProperties: false` is gone from every input schema.** The MCP SDK's `ToolSchema`
   cannot express it, so unknown arguments are no longer rejected. `McpSdkAssumptionsTest` fails if
   a future SDK gains the ability, which is the signal to restore it.

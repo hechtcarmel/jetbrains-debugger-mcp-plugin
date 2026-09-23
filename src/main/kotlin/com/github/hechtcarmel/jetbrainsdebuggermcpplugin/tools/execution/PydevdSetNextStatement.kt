@@ -3,7 +3,6 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.frame.XSuspendContext
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import java.lang.reflect.InvocationTargetException
@@ -82,9 +81,9 @@ internal class PydevdSetNextStatement private constructor(
                 reply.complete(Reply.Failed(describe(e.targetException)))
             } catch (e: ReflectiveOperationException) {
                 reply.complete(Reply.Failed(describe(e)))
-            } catch (e: CancellationException) {
-                throw e
             } catch (e: RuntimeException) {
+                // Method.invoke's own IllegalArgumentException and the like. No coroutine runs on this
+                // pooled thread, so there is no cancellation to propagate — only a reply to complete.
                 reply.complete(Reply.Failed(describe(e)))
             }
         })
