@@ -1,7 +1,7 @@
 # MCP tool manifest — golden snapshot
 # Snapshot of the SDK Tool as serialized to clients, not of the authored schema.
 # Regenerate: ./gradlew test --tests "*ToolManifestContractTest" -Dcontract.update=true
-# tools: 23
+# tools: 24
 
 ## evaluate_expression
 description:
@@ -590,6 +590,50 @@ outputSchema:
     ],
     "type": "object"
   }
+
+## jump_to_line
+description:
+  Moves the paused execution point to another line WITHOUT running the code in between (also known as Set Next Statement, Jump to Cursor, or Set Execution Point). Unlike run_to_line, skipped lines never execute, and jumping to an earlier line executes it again. The session stays paused at the new line.
+  Use to retry a block after fixing a value with set_variable, or to skip a call that crashes or has side effects, without restarting the session.
+  Works only inside the current function of the paused thread (its top stack frame, regardless of select_stack_frame), and only where the debugger supports it: currently Python sessions on the pydevd debugger backend. Other debuggers, including Java/Kotlin and Python's debugpy backend, return an error.
+  Skipped code leaves variables stale or unassigned, jumping back re-runs side effects, and skipped 'finally' blocks or 'with' exits do not run. Python refuses jumps into a 'for' loop body or an 'except' block.
+annotations:
+  {
+    "destructiveHint": true,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Jump to Line"
+  }
+inputSchema:
+  {
+    "properties": {
+      "file_path": {
+        "description": "Absolute path to the source file. Must be the file of the current execution point.",
+        "type": "string"
+      },
+      "line": {
+        "description": "Target line number (1-based) in the current function. It becomes the next line to execute.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Debug session ID. Uses current session if omitted.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "file_path",
+      "line"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
 
 ## list_breakpoints
 description:

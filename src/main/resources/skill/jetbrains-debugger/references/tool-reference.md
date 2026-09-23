@@ -207,6 +207,22 @@ Continue execution until a specific line is reached.
 
 **Requires:** Session paused. **New state:** "running" (will pause at target line)
 
+### `jump_to_line`
+Move the paused execution point to another line **without running the code in between** (Set Next Statement / Jump to Cursor). Skipped lines never execute; jumping to an earlier line executes it again. Use it to re-run a block after `set_variable`, or to skip a crashing or side-effecting call, without restarting.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `session_id` | string | No | Session ID |
+| `file_path` | string | **Yes** | Absolute path of the file of the current execution point |
+| `line` | integer | **Yes** | 1-based target line in the current function (min: 1) |
+| `project_path` | string | No | Project path |
+
+**Requires:** Session paused. **New state:** "paused" (at the target line; the tool returns once the debugger reports the new position)
+
+**Supported debuggers:** Python sessions on the pydevd backend. Any other debugger — Java/Kotlin (the JVM cannot move the execution point), JavaScript, PHP, Go, native, and Python's debugpy backend — returns an error naming the debugger.
+
+**Limits:** Only within the current function of the paused thread (its top frame, whatever `select_stack_frame` selected) and only in that file. Python refuses jumps into a `for` loop body or an `except` block, and reports why. Skipped code leaves variables stale or unassigned; skipped `finally` blocks and `with` exits do not run; jumping back re-runs side effects.
+
 ### `wait_for_pause`
 Wait for a debug session to pause (breakpoint hit, exception, or manual pause). Returns the full session status when paused, equivalent to calling `get_debug_session_status`. Use after `resume_execution`, `start_debug_session`, or any execution control tool to avoid manual polling.
 

@@ -59,6 +59,22 @@ class ToolArgumentBoundaryTest : McpHttpTestCase() {
         assertEquals("Session not found: bogus", errorText(callTool("resume_execution", """{"session_id":"bogus"}""")))
     }
 
+    fun `test jump_to_line validates its arguments before looking for a session`() {
+        assertEquals("Missing required parameter: file_path", errorText(callTool("jump_to_line", "{}")))
+        assertEquals(
+            "Missing required parameter: line",
+            errorText(callTool("jump_to_line", """{"file_path":"/nope/app.py"}"""))
+        )
+        assertEquals(
+            "Invalid value for parameter: line (must be >= 1)",
+            errorText(callTool("jump_to_line", """{"file_path":"/nope/app.py","line":0}"""))
+        )
+        assertEquals(
+            "No active debug session",
+            errorText(callTool("jump_to_line", """{"file_path":"/nope/app.py","line":3}"""))
+        )
+    }
+
     // ── Wrong JSON kind ─────────────────────────────────────────────────────────────────
 
     fun `test a stringified integer is a type error not a missing parameter`() {

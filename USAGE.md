@@ -1,6 +1,6 @@
 # Debugger MCP Server - Tool Reference
 
-This document provides detailed documentation for all 22 MCP tools available in the JetBrains Debugger MCP Server plugin.
+This document provides detailed documentation for all 24 MCP tools available in the JetBrains Debugger MCP Server plugin.
 
 ## Tool Overview
 
@@ -30,7 +30,7 @@ Tools are organized into categories based on functionality:
 | `set_breakpoint` | Set a line breakpoint |
 | `remove_breakpoint` | Remove a breakpoint |
 
-### Execution Control Tools (6)
+### Execution Control Tools (8)
 
 | Tool | Description |
 |------|-------------|
@@ -40,6 +40,8 @@ Tools are organized into categories based on functionality:
 | `step_into` | Step into method call |
 | `step_out` | Step out of current method |
 | `run_to_line` | Run to specific line |
+| `jump_to_line` | Move the execution point without running the code in between |
+| `wait_for_pause` | Block until the session pauses and return its full status |
 
 ### Stack & Thread Tools (3)
 
@@ -92,6 +94,7 @@ Tools are organized into categories based on functionality:
   - [step_into](#step_into)
   - [step_out](#step_out)
   - [run_to_line](#run_to_line)
+  - [jump_to_line](#jump_to_line)
 - [Stack & Thread Tools](#stack--thread-tools)
   - [get_stack_trace](#get_stack_trace)
   - [select_stack_frame](#select_stack_frame)
@@ -912,6 +915,60 @@ Continues execution until the specified line is reached.
   "targetLine": 58,
   "message": "Running to UserService.java:58"
 }
+```
+
+### jump_to_line
+
+Moves the paused execution point to another line **without running the code in between** — PyCharm's "Jump to Cursor", Visual Studio's "Set Next Statement". Skipped lines never execute, and jumping to an earlier line executes it again. The session stays paused at the new line.
+
+**Use when:**
+- Re-running a block after correcting a value with `set_variable`
+- Skipping a call that crashes or has side effects, without restarting the session
+
+**Supported debuggers:** Python sessions on the pydevd backend. Other debuggers (Java/Kotlin, JavaScript, PHP, Go, native, Python's debugpy backend) return an error naming the debugger.
+
+**Limits:** Only within the current function of the paused thread (its top frame) and only in that file. Python refuses jumps into a `for` loop body or an `except` block. Skipped code leaves variables stale or unassigned, skipped `finally` blocks and `with` exits do not run, and jumping back re-runs side effects.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `file_path` | string | Yes | Absolute path of the file of the current execution point |
+| `line` | integer | Yes | 1-based target line in the current function |
+| `session_id` | string | No | Session to move |
+| `project_path` | string | No | Project path |
+
+**Example Request:**
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "jump_to_line",
+    "arguments": {
+      "file_path": "/Users/dev/project/app/orders.py",
+      "line": 42
+    }
+  }
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "sessionId": "0f8c2a61-5d8e-4f3b-9a57-2c1e7b4d9e10",
+  "action": "jump_to_line",
+  "status": "success",
+  "message": "Execution point moved to /Users/dev/project/app/orders.py:42. The skipped lines did not run.",
+  "newState": "paused"
+}
+```
+
+**Example Error (debugger refused the jump):**
+
+```
+Cannot jump to /Users/dev/project/app/orders.py:37: can't jump into the body of a for loop
 ```
 
 ---

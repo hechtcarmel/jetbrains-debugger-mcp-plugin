@@ -4,6 +4,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp.runWithIdeModality
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.McpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.SetBreakpointTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.EvaluateTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.JumpToLineTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.PauseTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.ResumeTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.StepOverTool
@@ -39,7 +40,8 @@ import java.util.concurrent.TimeUnit
 /**
  * The one test that runs the debugger tools against a **real paused JVM** — the success paths of
  * `set_breakpoint` → `start_debug_session` → `wait_for_pause` → `get_variables` →
- * `evaluate_expression` → `step_over` → `get_stack_trace` → `stop_debug_session`, end to end.
+ * `evaluate_expression` → `step_over` → `get_stack_trace` → `stop_debug_session`, end to end, plus
+ * `jump_to_line`'s refusal on a debugger that cannot move the execution point.
  *
  * ## Infrastructure this test stands up
  *
@@ -173,7 +175,24 @@ class LiveDebugSessionTest : JavaCodeInsightFixtureTestCase() {
         assertEquals("Evaluation must not report an error: $evaluation", JsonNull, evaluation["error"])
         assertEquals("11", evaluation.str("value"))
 
+        // ── jump_to_line is refused: the JVM cannot move its execution point ────────────
+        val jump = runTool(JumpToLineTool(), buildJsonObject {
+            put("file_path", sourcePath)
+            put("line", STEP_TARGET_LINE)
+        })
+        assertTrue("jump_to_line must fail on the JVM debugger, got: ${resultText(jump)}", jump.isError == true)
+        assertTrue(
+            "The refusal must name the JVM debug process, got: ${resultText(jump)}",
+            resultText(jump).startsWith("Jump to line is not supported by this debugger (") &&
+                resultText(jump).contains("JavaDebugProcess")
+        )
+        assertFalse(
+            "The debugpy hint is for Python code only, got: ${resultText(jump)}",
+            resultText(jump).contains("debugpy")
+        )
+
         // ── step_over advances exactly one line ─────────────────────────────────────────
+        // (also proves the refused jump left the session paused where it was)
         structured(runTool(StepOverTool(), buildJsonObject {}))
         val afterStep = awaitPauseAtLine(STEP_TARGET_LINE)
         assertEquals("step", afterStep.str("pausedReason"))

@@ -4,6 +4,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.ListBr
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.RemoveBreakpointTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.SetBreakpointTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.evaluation.EvaluateTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.JumpToLineTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.PauseTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.ResumeTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.RunToLineTool
@@ -67,6 +68,7 @@ class ToolRegistry {
         // Execution Control Tools (P1)
         register(StepOutTool())
         register(RunToLineTool())
+        register(JumpToLineTool())
         register(WaitForPauseTool())
 
         // Stack Frame Tools (P0)

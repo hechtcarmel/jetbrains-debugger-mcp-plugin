@@ -119,6 +119,7 @@ class SessionRequirementTest : BasePlatformTestCase() {
 
         mapOf(
             "execution/RunToLineTool.kt" to "run to line",
+            "execution/JumpToLineTool.kt" to "jump to line",
             "evaluation/EvaluateTool.kt" to "evaluate expressions",
             "variable/GetVariablesTool.kt" to "get variables",
             "variable/SetVariableTool.kt" to "modify variables",

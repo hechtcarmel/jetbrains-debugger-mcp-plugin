@@ -47,6 +47,7 @@ IMPORTANT: When debugging, prefer using jetbrains-debugger MCP tools to interact
 | `step_into` | Step into function call |
 | `step_out` | Step out of current function |
 | `run_to_line` | Run until specific line is reached |
+| `jump_to_line` | Move the paused execution point to another line without running the code in between (Python/pydevd only) |
 | `wait_for_pause` | Wait for session to pause (breakpoint, exception, manual). Returns full status. |
 
 ### Inspection
@@ -230,7 +231,7 @@ it would cost more than it saves.
 
 | Layer | Location | What it protects |
 |-------|----------|------------------|
-| **Golden contracts** | `contract/` | The client-facing surface: 23 tool schemas, 27 result-model wire shapes |
+| **Golden contracts** | `contract/` | The client-facing surface: 24 tool schemas, 27 result-model wire shapes |
 | **SDK assumptions** | `mcp/McpSdkAssumptionsTest` | What this plugin relies on the MCP SDK doing — fails on an SDK bump, not a refactor |
 | **Transport conformance** | `server/transport/` | Every route, status code, header, Origin decision and SSE frame, over real HTTP |
 | **Tool behaviour** | `tools/**/*BehaviorTest` | What a tool actually does to IDE state |
