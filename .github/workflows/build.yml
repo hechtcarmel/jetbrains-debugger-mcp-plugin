@@ -114,9 +114,19 @@ jobs:
         with:
           cache-read-only: true
 
+      # CPython for the live pydevd suite (livedebug/LivePythonDebugSessionTest), pinned rather than
+      # taken from whatever the runner image ships
+      - name: Setup Python
+        id: python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
       # Run tests
       - name: Run Tests
         run: ./gradlew check
+        env:
+          MCP_LIVE_PYTHON: ${{ steps.python.outputs.python-path }}
 
       # Collect Tests Result of failed tests
       - name: Collect Tests Result

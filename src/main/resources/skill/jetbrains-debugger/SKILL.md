@@ -5,7 +5,7 @@ description: >-
   TRIGGER when ANY of these MCP tools are available: list_run_configurations, execute_run_configuration,
   start_debug_session, stop_debug_session, get_debug_session_status, list_debug_sessions,
   set_breakpoint, remove_breakpoint, list_breakpoints, resume_execution, pause_execution,
-  step_over, step_into, step_out, run_to_line, wait_for_pause, get_stack_trace, select_stack_frame,
+  step_over, step_into, step_out, run_to_line, jump_to_line, wait_for_pause, get_stack_trace, select_stack_frame,
   list_threads, get_variables, set_variable, get_source_context, evaluate_expression.
   Use when debugging any application, investigating bugs, tracing execution flow, inspecting
   runtime state, or when the user says "debug", "breakpoint", "step through", "inspect variable",
@@ -59,9 +59,9 @@ Use these tools to **actually debug** applications in a JetBrains IDE rather tha
 
 3. **Use `get_debug_session_status` to re-inspect state without waiting.** It returns variables, stack trace, source context, and current location in ONE call. Do NOT call `get_variables`, `get_stack_trace`, and `get_source_context` separately unless you need specific parameters (e.g., a different frame index or more context lines).
 
-4. **Line numbers are 1-based.** When setting breakpoints or using `run_to_line`, use the line numbers as they appear in the editor (starting from 1).
+4. **Line numbers are 1-based.** When setting breakpoints or using `run_to_line` / `jump_to_line`, use the line numbers as they appear in the editor (starting from 1).
 
-5. **File paths must be absolute.** For `set_breakpoint`, `run_to_line`, and `get_source_context`, always use absolute file paths (e.g., `/Users/dev/project/src/Main.java`). Files inside JARs are supported via the `!/` separator (e.g. `/path/to/lib-sources.jar!/com/example/Foo.kt`).
+5. **File paths must be absolute.** For `set_breakpoint`, `run_to_line`, `jump_to_line`, and `get_source_context`, always use absolute file paths (e.g., `/Users/dev/project/src/Main.java`). Files inside JARs are supported via the `!/` separator (e.g. `/path/to/lib-sources.jar!/com/example/Foo.kt`).
 
 6. **`session_id` is optional for single-session debugging.** When only one debug session exists, all tools auto-select it. Only specify `session_id` when multiple sessions are active.
 
@@ -115,6 +115,16 @@ Use these tools to **actually debug** applications in a JetBrains IDE rather tha
 4. resume_execution to see if the fix resolves the downstream issue
 ```
 
+### Pattern: Re-run or Skip Code Without Restarting (Python/pydevd)
+```
+1. Pause inside the function of interest
+2. set_variable to correct an input
+3. jump_to_line back to the line that uses it -- nothing runs; the session stays paused there
+4. step_over, then wait_for_pause -- the line executes again with the corrected input
+   (or jump_to_line past a crashing or side-effecting call to skip it)
+```
+`jump_to_line` only moves within the current function, and only where the debugger supports it (currently Python on the pydevd backend); elsewhere it returns an error.
+
 ## Common Mistakes to Avoid
 
 | Mistake | Correct Approach |
@@ -128,6 +138,7 @@ Use these tools to **actually debug** applications in a JetBrains IDE rather tha
 | Calling `evaluate_expression` with method calls in Rust/C++/Go | Use `get_variables` for native languages; method calls may fail in LLDB/GDB |
 | Using `log_message` `{expr}` placeholders in Rust/Go/Swift/C/C++ | Rejected at `set_breakpoint` — those debuggers cannot evaluate them; use a plain message or a single bare `{expr}` |
 | Retrying an `evaluate_expression` blocked by safety settings | Use `get_variables` or a simpler read-only expression; blocked categories are controlled by the user in IDE settings |
+| Using `jump_to_line` to execute code up to a line | `jump_to_line` skips the code in between; use `run_to_line` to run it |
 | Guessing variable values from source code | Use the debugger to inspect actual runtime values |
 | Forgetting to `stop_debug_session` when done | Always clean up debug sessions |
 
@@ -164,6 +175,7 @@ These use native debuggers (LLDB/GDB) with restrictions:
 | `step_into` | Enter function call | **Yes** |
 | `step_out` | Finish current function | **Yes** |
 | `run_to_line` | Run to specific line | **Yes** |
+| `jump_to_line` | Move the execution point without running skipped code (Python/pydevd) | **Yes** |
 | `get_stack_trace` | Full call stack | **Yes** |
 | `select_stack_frame` | Change frame context | **Yes** |
 | `list_threads` | See all threads | **Yes** |

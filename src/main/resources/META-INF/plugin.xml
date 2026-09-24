@@ -29,6 +29,7 @@ Set breakpoints, step through code, inspect variables, and evaluate expressionsâ
     <li><b>Step Over/Into/Out</b> - Navigate through code line by line</li>
     <li><b>Resume & Pause</b> - Control execution flow</li>
     <li><b>Run to Line</b> - Continue execution until a specific line</li>
+    <li><b>Jump to Line</b> - Move the execution point without running the code in between (Python/pydevd)</li>
 </ul>
 
 <h3>Variable Inspection</h3>

@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`jump_to_line` tool** ([#76](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/issues/76)) - Moves the paused execution point to another line of the current function without running the code in between ("Set Next Statement" / PyCharm's "Jump to Cursor"), so an agent can re-run a block after `set_variable` or skip a crashing call without restarting the session. Supported for Python sessions on the pydevd debugger backend; the tool waits until the debugger reports the new position, and returns the debugger's reason when a jump is refused (for example, into a `for` loop body). Other debuggers — including Java/Kotlin, where the JVM cannot move the execution point, and Python's debugpy backend — return an error naming the debugger.
+
 ## [5.0.2] - 2026-08-13
 
 ### Fixed

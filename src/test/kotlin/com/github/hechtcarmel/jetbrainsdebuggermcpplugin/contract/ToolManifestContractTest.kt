@@ -49,6 +49,7 @@ class ToolManifestContractTest {
             "get_source_context",
             "get_stack_trace",
             "get_variables",
+            "jump_to_line",
             "list_breakpoints",
             "list_debug_sessions",
             "list_run_configurations",
