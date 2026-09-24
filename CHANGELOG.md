@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-09-24
+
 ### Added
 
 - **`jump_to_line` tool** ([#76](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/issues/76)) - Moves the paused execution point to another line of the current function without running the code in between ("Set Next Statement" / PyCharm's "Jump to Cursor"), so an agent can re-run a block after `set_variable` or skip a crashing call without restarting the session. Supported for Python sessions on the pydevd debugger backend; the tool waits until the debugger reports the new position, and returns the debugger's reason when a jump is refused (for example, into a `for` loop body). Other debuggers — including Java/Kotlin, where the JVM cannot move the execution point, and Python's debugpy backend — return an error naming the debugger.
@@ -279,7 +281,8 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.2...HEAD
+[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.1.0...HEAD
+[5.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.2...v5.1.0
 [5.0.2]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.1...v5.0.2
 [5.0.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.4.0...v5.0.0
