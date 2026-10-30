@@ -111,7 +111,7 @@ class McpSettingsConfigurable : Configurable {
             .addLabeledComponent(JBLabel("Max history size:"), maxHistorySpinner!!, 1, false)
             .addSeparator()
             .addComponent(JBLabel("<html><b>Exposed Tools</b></html>"))
-            .addComponent(JBLabel("Changes apply immediately. Clients may need to refresh their tool list."))
+            .addComponent(JBLabel("Changes take effect when applied. Clients may need to refresh their tool list."))
             .addComponent(toolsPanel)
             .addSeparator()
             .addComponent(JBLabel("<html><b>Evaluate Expression Safety</b></html>"))
@@ -233,6 +233,7 @@ class McpSettingsConfigurable : Configurable {
         maxHistorySpinner?.value = settings.maxHistorySize
         safetyModeComboBox?.selectedItem = settings.evaluateExpressionSafetyMode
         customRegexTableModel?.setItems(settings.customEvaluateExpressionBlockRules)
+        toolTable?.stopEditing()
         toolTableModel?.setItems(toolNames.map { ToolRow(it, it !in settings.disabledTools) })
         updateSafetyModeExplanation()
     }
