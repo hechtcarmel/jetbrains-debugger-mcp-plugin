@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-10-30
+
 ### Added
 
 - **Exposed tools settings** ([#85](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/issues/85)) — Enable or disable individual MCP tools in IDE settings. All tools remain enabled by default; disabled tools are omitted from discovery and cannot be called. Changes apply to existing connections, which are notified to refresh their tool lists.
@@ -291,7 +293,8 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.2.0...HEAD
+[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.3.0...HEAD
+[5.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.2...v5.1.0
 [5.0.2]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.1...v5.0.2
