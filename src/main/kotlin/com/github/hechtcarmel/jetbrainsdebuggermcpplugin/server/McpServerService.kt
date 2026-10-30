@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class McpServerService(@Suppress("unused") private val coroutineScope: CoroutineScope) : Disposable {
 
     private val toolRegistry: ToolRegistry = ToolRegistry()
+    private val bridge = McpToolBridge()
     private val mcpServer: Server
     private var ktorServer: KtorMcpServer? = null
     private var serverError: ServerError? = null
@@ -64,7 +65,7 @@ class McpServerService(@Suppress("unused") private val coroutineScope: Coroutine
 
         // Register built-in tools
         toolRegistry.registerBuiltInTools()
-        mcpServer = McpServerFactory.create(toolRegistry, McpToolBridge())
+        mcpServer = McpServerFactory.create(toolRegistry, bridge, McpSettings.getInstance().disabledTools)
 
         LOG.info("MCP Server Service initialized (server not yet started)")
     }
@@ -167,6 +168,10 @@ class McpServerService(@Suppress("unused") private val coroutineScope: Coroutine
     fun getServerError(): ServerError? = serverError
 
     fun getToolRegistry(): ToolRegistry = toolRegistry
+
+    fun updateExposedTools(oldDisabled: Set<String>, newDisabled: Set<String>) {
+        McpServerFactory.updateTools(mcpServer, toolRegistry, bridge, oldDisabled, newDisabled)
+    }
 
     /**
      * Returns the Streamable HTTP endpoint URL for MCP connections (primary transport).

@@ -1,6 +1,7 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.McpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolRegistry
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.toSdkTool
 import io.modelcontextprotocol.kotlin.sdk.server.ClientConnection
@@ -19,7 +20,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
  */
 object McpServerFactory {
 
-    fun create(registry: ToolRegistry, bridge: McpToolBridge): Server {
+    fun create(registry: ToolRegistry, bridge: McpToolBridge, disabledTools: Set<String> = emptySet()): Server {
         val server = Server(
             serverInfo = Implementation(
                 name = McpConstants.getServerName(),
@@ -27,7 +28,7 @@ object McpServerFactory {
             ),
             options = ServerOptions(
                 capabilities = ServerCapabilities(
-                    tools = ServerCapabilities.Tools(listChanged = false)
+                    tools = ServerCapabilities.Tools(listChanged = true)
                 )
             ),
             // The server's prose description belongs in `instructions`. The pre-SDK code hung it off
@@ -38,12 +39,23 @@ object McpServerFactory {
 
         // Sorted so `tools/list` is deterministic. ToolRegistry is a ConcurrentHashMap, whose
         // iteration order is arbitrary and was previously observable by clients.
-        registry.getAllTools().sortedBy { it.name }.forEach { tool ->
-            val handler: suspend (ClientConnection, CallToolRequest) -> CallToolResult =
-                { _, request -> bridge.invoke(tool, request) }
-            server.addTool(tool.toSdkTool(), handler)
+        registry.getAllTools().filterNot { it.name in disabledTools }.sortedBy { it.name }.forEach { tool ->
+            addTool(server, tool, bridge)
         }
 
         return server
+    }
+
+    fun updateTools(server: Server, registry: ToolRegistry, bridge: McpToolBridge, oldDisabled: Set<String>, newDisabled: Set<String>) {
+        registry.getAllTools().sortedBy { it.name }.forEach { tool ->
+            if (tool.name !in oldDisabled && tool.name in newDisabled) server.removeTool(tool.name)
+            if (tool.name in oldDisabled && tool.name !in newDisabled) addTool(server, tool, bridge)
+        }
+    }
+
+    private fun addTool(server: Server, tool: McpTool, bridge: McpToolBridge) {
+        val handler: suspend (ClientConnection, CallToolRequest) -> CallToolResult =
+            { _, request -> bridge.invoke(tool, request) }
+        server.addTool(tool.toSdkTool(), handler)
     }
 }
