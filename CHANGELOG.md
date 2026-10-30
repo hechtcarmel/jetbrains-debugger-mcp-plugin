@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Exposed tools settings** ([#85](https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/issues/85)) — Enable or disable individual MCP tools in IDE settings. All tools remain enabled by default; disabled tools are omitted from discovery and cannot be called. Changes apply to existing connections, which are notified to refresh their tool lists.
+
 ## [5.2.0] - 2026-10-26
 
 ### Added

@@ -1,6 +1,8 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.server.transport
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.McpConstants
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp.McpServerFactory
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.mcp.McpToolBridge
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -160,6 +162,33 @@ class LegacyTransportTest : McpHttpTestCase() {
                 registry.getToolCount(),
                 tools.size
             )
+        } finally {
+            runCatching { body.close() }
+            client.shutdownNow()
+        }
+    }
+
+    fun `test legacy SSE sees disabled tools in an existing session`() {
+        val client = java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
+        val request = HttpRequest.newBuilder(URI.create(url(McpConstants.SSE_ENDPOINT_PATH)))
+            .timeout(Duration.ofSeconds(30)).GET().build()
+        val body = client.send(request, HttpResponse.BodyHandlers.ofInputStream()).body()
+        try {
+            val lines = java.util.concurrent.LinkedBlockingQueue<String>()
+            Thread { runCatching { body.bufferedReader().forEachLine { lines.put(it) } } }.apply {
+                isDaemon = true
+                start()
+            }
+            val endpoint = readEndpointEvent(lines)
+            McpServerFactory.updateTools(mcpServer, registry, McpToolBridge(), emptySet(), setOf("jump_to_line"))
+            assertEquals(202, post(endpoint, rpc("tools/list")).statusCode())
+            // List-change notifications can arrive before the reply on the same stream.
+            var reply = json.parseToJsonElement(readMessageEvent(lines)).jsonObject
+            while (reply["result"] == null) reply = json.parseToJsonElement(readMessageEvent(lines)).jsonObject
+            val names = reply["result"]!!.jsonObject["tools"]!!.jsonArray
+                .map { it.jsonObject["name"]!!.jsonPrimitive.content }
+            assertFalse(names.contains("jump_to_line"))
+            assertTrue(names.contains("step_over"))
         } finally {
             runCatching { body.close() }
             client.shutdownNow()

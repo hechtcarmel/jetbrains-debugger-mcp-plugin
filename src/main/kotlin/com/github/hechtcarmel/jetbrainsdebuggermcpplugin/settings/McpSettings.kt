@@ -31,6 +31,7 @@ class McpSettings : PersistentStateComponent<McpSettings.State> {
         var serverHost: String = "", // empty means use DEFAULT_SERVER_HOST
         var evaluateExpressionSafetyModeId: String = EvaluateExpressionSafetyMode.DEFAULT.id,
         var customEvaluateExpressionBlockRules: MutableList<CustomEvaluateExpressionBlockRule> = mutableListOf(),
+        var disabledTools: MutableList<String> = mutableListOf(),
         var migratedToVersion: Int = 0 // Track migration status (2 = v2.0.0 migration done)
     )
 
@@ -41,6 +42,10 @@ class McpSettings : PersistentStateComponent<McpSettings.State> {
     override fun loadState(state: State) {
         XmlSerializerUtil.copyBean(state, myState)
     }
+
+    var disabledTools: Set<String>
+        get() = myState.disabledTools.toSet()
+        set(value) { myState.disabledTools = value.sorted().toMutableList() }
 
     var maxHistorySize: Int
         get() = myState.maxHistorySize

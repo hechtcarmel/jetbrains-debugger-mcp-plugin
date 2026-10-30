@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit
 abstract class McpHttpTestCase : BasePlatformTestCase() {
 
     protected val json = Json { ignoreUnknownKeys = true }
+    protected open fun initialDisabledTools(registry: ToolRegistry): Set<String> = emptySet()
 
     private lateinit var server: KtorMcpServer
     private lateinit var http: HttpClient
@@ -53,7 +54,7 @@ abstract class McpHttpTestCase : BasePlatformTestCase() {
         super.setUp()
         registry = ToolRegistry().apply { registerBuiltInTools() }
         port = freePort()
-        mcpServer = McpServerFactory.create(registry, McpToolBridge())
+        mcpServer = McpServerFactory.create(registry, McpToolBridge(), initialDisabledTools(registry))
         server = KtorMcpServer(
             port = port,
             mcpServer = mcpServer,
