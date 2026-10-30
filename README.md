@@ -399,7 +399,7 @@ Configure the plugin at <kbd>Settings</kbd> > <kbd>Tools</kbd> > <kbd>Debugger M
 |---------|---------|-------------|
 | Server Host | 127.0.0.1 | Bind address for the MCP server. Use `127.0.0.1` for localhost only, `0.0.0.0` for all interfaces, or a custom IP |
 | Server Port | IDE-specific | Each IDE has a unique default port (e.g., 29190 for IntelliJ, 29192 for PyCharm). Range: 1024-65535 |
-| Exposed Tools | All enabled | Choose individual tools to expose. Changes apply to existing connections; clients that cache tools may need to refresh or reconnect. Calls already in progress continue. |
+| Exposed tools | All enabled | Choose individual tools to expose. Changes apply to existing connections; clients that cache tools may need to refresh or reconnect. Calls already in progress continue. |
 | Max History Size | 1000 | Maximum number of commands to keep in history |
 | Evaluate Expression Safety Mode | Unrestricted | Controls plugin-side filtering before `evaluate_expression` reaches the debugger evaluator. `Unrestricted` preserves previous behavior. `Default blocklist` blocks built-in risky categories. `Read-only` also rejects mutation syntax and method calls that cannot be proven read-only |
 | Additional blocked regex patterns | None | Optional custom deny rules for `evaluate_expression`. They apply in `Default blocklist` and `Read-only`, never in `Unrestricted`, and match expression text after comments and string literals are removed |

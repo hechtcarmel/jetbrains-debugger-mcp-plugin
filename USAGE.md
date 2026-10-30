@@ -2,7 +2,7 @@
 
 This document provides detailed documentation for all 25 MCP tools available in the JetBrains Debugger MCP Server plugin.
 
-In **Settings > Tools > Debugger MCP Server**, use **Exposed Tools** to enable or disable individual tools. All are enabled by default. Disabled tools are omitted from `tools/list` and cannot be called. Changes apply to existing connections and emit a tool-list change notification; clients that cache the list may need to refresh or reconnect. Calls already in progress continue. The selection applies across projects and debugger backends; it does not detect backend capabilities automatically.
+In **Settings > Tools > Debugger MCP Server**, use **Exposed tools** to enable or disable individual tools. All are enabled by default. Disabled tools are omitted from `tools/list` and cannot be called. Changes apply to existing connections and emit a tool-list change notification; clients that cache the list may need to refresh or reconnect. Calls already in progress continue. The selection applies across projects and debugger backends; it does not detect backend capabilities automatically.
 
 ## Tool Overview
 

@@ -110,7 +110,7 @@ class McpSettingsConfigurable : Configurable {
             .addLabeledComponent(JBLabel("Server port:"), serverPortSpinner!!, 1, false)
             .addLabeledComponent(JBLabel("Max history size:"), maxHistorySpinner!!, 1, false)
             .addSeparator()
-            .addComponent(JBLabel("<html><b>Exposed Tools</b></html>"))
+            .addComponent(JBLabel("<html><b>Exposed tools</b></html>"))
             .addComponent(JBLabel("Changes take effect when applied. Clients may need to refresh their tool list."))
             .addComponent(toolsPanel)
             .addSeparator()
@@ -234,7 +234,7 @@ class McpSettingsConfigurable : Configurable {
         safetyModeComboBox?.selectedItem = settings.evaluateExpressionSafetyMode
         customRegexTableModel?.setItems(settings.customEvaluateExpressionBlockRules)
         toolTable?.stopEditing()
-        toolTableModel?.setItems(toolNames.map { ToolRow(it, it !in settings.disabledTools) })
+        toolTableModel?.items = toolNames.map { ToolRow(it, it !in settings.disabledTools) }
         updateSafetyModeExplanation()
     }
 
