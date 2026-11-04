@@ -1,0 +1,5 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.github.hechtcarmel.jetbrainsdebuggermcpplugin">
+        <androidAttachBackend implementation="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.TypedAndroidAttachBackend"/>
+    </extensions>
+</idea-plugin>

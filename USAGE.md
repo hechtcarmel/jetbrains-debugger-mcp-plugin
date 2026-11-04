@@ -1,6 +1,6 @@
 # Debugger MCP Server - Tool Reference
 
-This document provides detailed documentation for all 25 MCP tools available in the JetBrains Debugger MCP Server plugin.
+This document provides detailed documentation for all 27 MCP tools available in the JetBrains Debugger MCP Server plugin.
 
 In **Settings > Tools > Debugger MCP Server**, use **Exposed tools** to enable or disable individual tools. All are enabled by default. Disabled tools are omitted from `tools/list` and cannot be called. Changes apply to existing connections and emit a tool-list change notification; clients that cache the list may need to refresh or reconnect. Calls already in progress continue. The selection applies across projects and debugger backends; it does not detect backend capabilities automatically.
 
@@ -15,11 +15,13 @@ Tools are organized into categories based on functionality:
 | `list_run_configurations` | List all available run configurations |
 | `execute_run_configuration` | Execute a run configuration in run or debug mode |
 
-### Debug Session Tools (5)
+### Debug Session Tools (7)
 
 | Tool | Description |
 |------|-------------|
 | `list_debug_sessions` | List all active debug sessions |
+| `list_android_processes` | List running Android processes for direct attachment |
+| `attach_android_debugger` | Attach the Android debugger to a running Android app process |
 | `start_debug_session` | Start a new debug session |
 | `stop_debug_session` | Stop a debug session |
 | `get_debug_session_status` | Get comprehensive session status |
@@ -83,6 +85,8 @@ Tools are organized into categories based on functionality:
   - [execute_run_configuration](#execute_run_configuration)
 - [Debug Session Tools](#debug-session-tools)
   - [list_debug_sessions](#list_debug_sessions)
+  - [list_android_processes](#list_android_processes)
+  - [attach_android_debugger](#attach_android_debugger)
   - [start_debug_session](#start_debug_session)
   - [stop_debug_session](#stop_debug_session)
   - [get_debug_session_status](#get_debug_session_status)
@@ -284,6 +288,131 @@ Lists all active debug sessions.
 
 ---
 
+### list_android_processes
+
+Lists running Android processes visible to the IDE debugger on online devices and emulators.
+Requires the Android plugin and an initialized Android Debug Bridge (ADB).
+
+**Use when:**
+
+- Finding a running app or subprocess to attach to
+- Obtaining device serials and PIDs when multiple devices are connected
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_path` | string | No | Project path (required if multiple projects open) |
+| `device_serial` | string | No | Exact device serial to filter by |
+
+**Example Request:**
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "list_android_processes",
+    "arguments": {"device_serial": "emulator-5554"}
+  }
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "processes": [
+    {
+      "deviceSerial": "emulator-5554",
+      "processId": 123,
+      "processName": "com.example.app",
+      "debuggerAttached": false
+    }
+  ]
+}
+```
+
+`processName` can be null while the device reports process metadata; select such a process by PID.
+Only processes exposed by the IDE's ddmlib clients are listed, typically debuggable apps.
+No matching online processes returns an empty list. ADB initialization waits up to 10 seconds;
+incomplete device discovery returns an error asking you to retry.
+
+---
+
+### attach_android_debugger
+
+Attaches the IDE's Android debugger to an existing Android app process without installation,
+launching the app, or opening a process chooser. Requires the Android plugin, a compatible
+attach API, and a connected Android device or emulator with a process visible to the IDE debugger.
+
+**Use when:**
+
+- Debugging an app that is already running
+- Attaching to a specific subprocess without launching a run configuration
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_path` | string | No | Project path (required if multiple projects open) |
+| `process_id` | integer | Unless process_name is supplied | Positive Android PID |
+| `process_name` | string | Unless process_id is supplied | Exact Android process name including any `:subprocess` suffix |
+| `device_serial` | string | No | Exact device serial; required when multiple devices match |
+| `debugger_id` | string | No | Android debugger ID; default `Java` for Java/Kotlin. Other IDs depend on installed debuggers. |
+
+**Example Request:**
+
+First call `list_android_processes`, then use the returned process name or PID and device serial:
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "attach_android_debugger",
+    "arguments": {
+      "process_name": "com.example.app",
+      "device_serial": "emulator-5554"
+    }
+  }
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "status": "started",
+  "message": "Debugger attached to Android process com.example.app (PID 123) on emulator-5554",
+  "session": {
+    "id": "session_12345",
+    "name": "Android Java Debugger (123)",
+    "state": "running",
+    "isCurrent": true,
+    "runConfigurationName": null,
+    "processId": 123
+  }
+}
+```
+
+Session names and the initial state depend on the Android debugger. Use `session.id` with
+`get_debug_session_status`, breakpoints, stepping, evaluation and console tools.
+
+Both name and PID must match when both are supplied. Missing or ambiguous targets return
+`isError: true` with available processes. Attachment returns the exact session created by the
+Android API or reuses an existing active session in the same project. A debugger owned by another
+project or client is an error. `configuration_name` is not accepted; use `start_debug_session`
+for configuration launch.
+
+Android support is optional and loaded only when these tools are called. A missing plugin,
+incompatible API or missing dependency returns `isError: true` without disabling other tools.
+If automatic attachment is unavailable, use the IDE's **Attach Debugger to Android Process**
+action, then call `list_debug_sessions` to use the attached session through MCP. Android support is
+compiled against a development dependency and loaded through the optional Android descriptor;
+installed incompatible APIs return tool errors. The dependency is not bundled or required for
+other debugger tools.
+
+---
+
 ### start_debug_session
 
 Starts a new debug session for a run configuration.
@@ -317,12 +446,22 @@ Starts a new debug session for a run configuration.
 
 ```json
 {
-  "sessionId": "session_12345",
-  "name": "Application",
-  "state": "running",
-  "message": "Debug session started for 'Application'"
+  "status": "started",
+  "message": "Debug session started for: Application",
+  "session": {
+    "id": "session_12345",
+    "name": "Application",
+    "state": "running",
+    "isCurrent": true,
+    "runConfigurationName": "Application",
+    "processId": null
+  }
 }
 ```
+
+The tool waits up to 30 seconds for a session. Slow launches return `status: "starting"` and
+`session: null`; use `list_debug_sessions` to discover it. For a running Android app, use
+`attach_android_debugger`.
 
 ---
 

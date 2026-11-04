@@ -18,7 +18,8 @@ A JetBrains IDE plugin that exposes an **MCP (Model Context Protocol) server**, 
 ### Features
 
 **Debug Session Management**
-- **Start/Stop Sessions** - Launch any run configuration in debug mode
+- **Start/Stop Sessions** - Launch run configurations in debug mode
+- **Android Process Attachment** - Discover and attach to running Android apps (optional Android plugin)
 - **Rich Status** - Get comprehensive state in a single call (variables, stack, source context)
 - **Multi-Session Support** - Manage multiple concurrent debug sessions
 
@@ -59,7 +60,7 @@ Unlike manual debugging, this plugin enables:
 - **Rich Context in Single Calls** - Get variables, stack, and source in one request
 - **Programmatic Breakpoint Control** - Set conditional breakpoints with complex expressions
 - **Cross-IDE Compatibility** - Works with any JetBrains IDE that supports XDebugger
-- **25 Comprehensive Tools** - Full debugging capability through MCP
+- **27 Comprehensive Tools** - Full debugging capability through MCP
 - **Configurable Server** - IDE-specific ports with customizable host binding
 
 Perfect for AI-assisted development workflows where you want your assistant to investigate bugs, validate fixes, or explore code behavior autonomously.
@@ -230,7 +231,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ## Available Tools
 
-The plugin provides **25 MCP tools** organized by category:
+The plugin provides **27 MCP tools** organized by category:
 
 ### Run Configuration Tools
 
@@ -244,10 +245,34 @@ The plugin provides **25 MCP tools** organized by category:
 | Tool | Description |
 |------|-------------|
 | `list_debug_sessions` | List all active debug sessions with state and metadata |
+| `list_android_processes` | List running Android processes with device serial, PID and process name |
+| `attach_android_debugger` | Attach the Android debugger to a running Android app process without a chooser |
 | `start_debug_session` | Start a new debug session for a run configuration |
 | `stop_debug_session` | Stop/terminate a debug session |
 | `get_debug_session_status` | Get comprehensive status (variables, stack, source) in one call |
 | `get_console_output` | Read retained console output, including logpoints, while running or paused |
+
+For an already running Android app, call `list_android_processes`, then call
+`attach_android_debugger` with `process_name` or `process_id` and, when needed, `device_serial`:
+
+```json
+{"process_name": "com.example.app", "device_serial": "emulator-5554"}
+```
+
+This uses the Android debugger directly without
+installing or launching the app. Names match exactly, including `:subprocess` suffixes. Multiple
+matches return an error with candidate processes. Attachment requires the Android plugin and
+defaults to its Java/Kotlin debugger. Android support is optional: a missing or incompatible Android
+plugin returns a tool error while other tools remain available. If automatic attachment is
+unavailable, attach through the IDE's **Attach Debugger to Android Process** action and use
+`list_debug_sessions` to discover the session. Process attachment on other platforms is not
+currently supported.
+
+New attachments use default debugger state and do not inherit a run configuration's LLDB startup
+commands or symbol directories. An existing matching debug session in the same project may be
+reused. To apply native debugger settings from a run configuration, use the IDE's
+[Attach Debugger to Android Process](https://developer.android.com/studio/debug#attach-debugger)
+workflow and select the option to reuse that configuration.
 
 ### Breakpoint Tools
 

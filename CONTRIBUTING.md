@@ -10,12 +10,19 @@ three project-specific tripwires that catch almost every new contributor. Read t
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)   # macOS; on Linux point at any JDK 21
 
 ./gradlew build          # compile + test + verify
-./gradlew test           # whole suite, platform tests included — ~40s headless
+./gradlew test           # whole suite, platform and typed Android tests included
+./gradlew check          # tests, configuration and coverage gates
 ./gradlew runIde         # launch a sandbox IDE with the plugin installed
 ```
 
-Run `./gradlew test` before pushing. There is no separate "fast tier" — the suite is small enough
-that splitting it would cost more than it saves.
+Run `./gradlew check` before pushing. `compatiblePlugin("org.jetbrains.android")` selects the
+latest Android development/test plugin compatible with `platformVersion` through Marketplace.
+Its libraries remain separate from this plugin's distribution, and its runtime dependency remains
+optional. Dependency resolution requires Marketplace access; a new compatible release can change
+the selected API declarations without a source edit.
+
+To recheck Marketplace instead of reusing the previous configuration, run
+`./gradlew check --no-configuration-cache --refresh-dependencies`.
 
 ## The Three Tripwires
 
@@ -77,5 +84,5 @@ a client-breaking change, and such branches must land with zero diff in those fi
 1. Fork, create a feature branch (`feat/`, `fix/`, `chore/`, `test/` prefixes are the convention)
 2. Make your changes, following existing patterns
 3. Add or update tests in the same style as the surrounding suite
-4. Run `./gradlew test` with JDK 21
+4. Run `./gradlew check` with JDK 21
 5. Open a PR against `main`

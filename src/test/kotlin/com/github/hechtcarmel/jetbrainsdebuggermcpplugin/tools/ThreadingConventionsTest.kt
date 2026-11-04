@@ -49,6 +49,8 @@ class ThreadingConventionsTest {
     private val migratedFiles = listOf(
         "AbstractMcpTool.kt",
         "session/StartDebugSessionTool.kt",
+        "session/AttachAndroidDebuggerTool.kt",
+        "session/ListAndroidProcessesTool.kt",
         "session/StopDebugSessionTool.kt",
         "session/GetConsoleOutputTool.kt",
         "stack/SelectStackFrameTool.kt",

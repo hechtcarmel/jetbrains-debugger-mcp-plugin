@@ -18,6 +18,8 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.RunConf
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.GetDebugSessionStatusTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.GetConsoleOutputTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.ListDebugSessionsTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.ListAndroidProcessesTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.AttachAndroidDebuggerTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.StartDebugSessionTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.StopDebugSessionTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.stack.GetStackTraceTool
@@ -51,6 +53,8 @@ class ToolRegistry {
 
         // Debug Session Tools
         register(ListDebugSessionsTool())
+        register(ListAndroidProcessesTool())
+        register(AttachAndroidDebuggerTool())
         register(StartDebugSessionTool())
         register(StopDebugSessionTool())
         register(GetDebugSessionStatusTool())

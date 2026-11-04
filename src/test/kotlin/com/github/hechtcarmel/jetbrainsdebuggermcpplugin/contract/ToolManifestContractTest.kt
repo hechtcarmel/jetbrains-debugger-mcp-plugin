@@ -43,6 +43,7 @@ class ToolManifestContractTest {
          * otherwise the snapshot would be self-consistent and green.
          */
         val EXPECTED_TOOL_NAMES = setOf(
+            "attach_android_debugger",
             "evaluate_expression",
             "execute_run_configuration",
             "get_console_output",
@@ -52,6 +53,7 @@ class ToolManifestContractTest {
             "get_variables",
             "jump_to_line",
             "list_breakpoints",
+            "list_android_processes",
             "list_debug_sessions",
             "list_run_configurations",
             "list_threads",

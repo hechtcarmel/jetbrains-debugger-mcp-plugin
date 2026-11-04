@@ -1,6 +1,8 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.contract
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandEntryExport
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.AndroidProcessInfo
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.AndroidProcessListResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.breakpoint.BreakpointListResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.BreakpointHitInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.BreakpointInfo
@@ -86,6 +88,8 @@ class ResultShapeContractTest {
             serializer<RemoveBreakpointResult>().descriptor,
 
             // Sessions
+            serializer<AndroidProcessInfo>().descriptor,
+            serializer<AndroidProcessListResult>().descriptor,
             serializer<DebugSessionInfo>().descriptor,
             serializer<ConsoleOutputResult>().descriptor,
             serializer<DebugSessionStatus>().descriptor,

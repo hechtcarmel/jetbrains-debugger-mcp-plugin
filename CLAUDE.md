@@ -27,6 +27,8 @@ IMPORTANT: When debugging, prefer using jetbrains-debugger MCP tools to interact
 | `list_run_configurations` | List available run configurations |
 | `execute_run_configuration` | Run a configuration (debug or run mode) |
 | `list_debug_sessions` | List active debug sessions |
+| `list_android_processes` | List running Android processes by device serial, PID and exact name |
+| `attach_android_debugger` | Attach the Android debugger to a running Android app process |
 | `start_debug_session` | Start a new debug session |
 | `stop_debug_session` | Stop a debug session |
 | `get_debug_session_status` | Get comprehensive session state (variables, stack, source) |
@@ -132,6 +134,25 @@ If omitted with multiple projects, tools return an error listing available proje
 
 ## Common Patterns
 
+### Attach to a Running Android Process
+
+Call `list_android_processes`, then `attach_android_debugger` with `process_name` or `process_id`
+and, if multiple devices match, `device_serial`. This attaches through
+the Android debugger API without installing or launching the app or opening a process chooser.
+Names match exactly, including `:subprocess` suffixes. Ambiguous targets return candidates.
+Requires the optional Android plugin, a compatible attach API and a connected device. Android
+classes resolve only on tool invocation; missing dependencies or incompatible APIs return a tool
+error. For manual fallback, attach through the IDE's **Attach Debugger to Android Process** action
+and discover the session with `list_debug_sessions`. Attachment on other platforms is not supported.
+
+The typed adapter in `tools/session/TypedAndroidAttachBackend.kt` names the upstream Android source
+repositories and files. It is registered through the optional Android descriptor, so the core tools
+and their backend interface can load without Android. Direct API calls are checked against a
+standard `compatiblePlugin("org.jetbrains.android")` dependency; Marketplace selects the latest
+release compatible with the configured IntelliJ target. Its libraries are separate from the shipped
+plugin and available to the normal test sandbox. Runtime linkage failures remain tool errors.
+New compatible SDK releases can expose API changes at build time without manually updating a pin.
+
 ### Find Why a Value is Wrong
 ```
 1. set_breakpoint at the line where the wrong value is used
@@ -214,7 +235,7 @@ These languages use native debuggers (LLDB/GDB) with some limitations:
 ## Requirements
 
 - JetBrains IDE (IntelliJ IDEA, PyCharm, WebStorm, RustRover, CLion, GoLand, etc.)
-- IDE must have an open project with a debuggable run configuration
+- IDE must have an open project and a debuggable run configuration or an existing Android process
 - This plugin must be installed and enabled
 
 ---
@@ -222,11 +243,12 @@ These languages use native debuggers (LLDB/GDB) with some limitations:
 ## Developer Guide: Testing
 
 ```bash
-./gradlew test    # whole suite, platform tests included — ~40s headless
+./gradlew test    # whole suite, including typed Android API fixtures
+./gradlew check   # tests, project configuration and coverage gates
 ```
 
-Run it before pushing. There is no separate "fast tier": the suite is small enough that splitting
-it would cost more than it saves.
+Run `check` before pushing. Android is included in the development/test sandbox through the
+standard IntelliJ Platform plugin dependency configuration.
 
 The live Python suite needs a CPython 3 interpreter: `MCP_LIVE_PYTHON=/path/to/python3`, or `python3`
 on the `PATH`. CI pins 3.12 with `actions/setup-python`. The Python plugin it drives (PythonCore) is a
@@ -237,12 +259,13 @@ in step with `platformVersion`.
 
 | Layer | Location | What it protects |
 |-------|----------|------------------|
-| **Golden contracts** | `contract/` | The client-facing surface: 25 tool schemas, 28 result-model wire shapes |
+| **Golden contracts** | `contract/` | The client-facing surface: 27 tool schemas, 30 result-model wire shapes |
 | **SDK assumptions** | `mcp/McpSdkAssumptionsTest` | What this plugin relies on the MCP SDK doing — fails on an SDK bump, not a refactor |
 | **Transport conformance** | `server/transport/` | Every route, status code, header, Origin decision and SSE frame, over real HTTP |
 | **Tool behaviour** | `tools/**/*BehaviorTest` | What a tool actually does to IDE state |
 | **Live debuggee** | `livedebug/LiveDebugSessionTest` | The paused-state success paths against a real JVM: breakpoint hit, variables, evaluation, stepping, stack |
 | **Live Python debuggee** | `livedebug/LivePythonDebugSessionTest` | `jump_to_line` against a real pydevd session: backward, forward and in-function jumps, CPython's and pydevd's refusals, wrong file, not paused |
+| **Typed Android** | `tools/session/TypedAndroidAttachBackendTest` | SDK-based discovery and attach fixtures in the ordinary suite |
 | **Unit** | everything else | Pure logic — log-message transforms, safety analysis, value presentation |
 
 ### Golden contract files
@@ -298,6 +321,13 @@ Stated plainly so nobody mistakes the suite for more than it is:
   live: `step_into`, `step_out`, `run_to_line`, `pause_execution`, `set_variable`,
   `list_threads`, `select_stack_frame`, conditional breakpoints actually firing, and every
   debugger other than the JVM's and pydevd.
+- **Android attachment has no live device test in this suite.** The ordinary suite includes the
+  Android plugin and SDK-based discovery/attach fixtures. `AndroidToolsBehaviorTest` checks backend
+  registration and unavailable-backend errors over HTTP. `AndroidOptionalLoadingTest` loads plugin
+  classes separately with Android API packages blocked to detect eager references during tool
+  registration. This is a limited loading smoke test, not a complete Android-absent IDE environment.
+  Actual device attachment and Native/Hybrid debuggers require manual validation; installed APIs
+  must remain binary-compatible with the compilation target.
 - **`jump_to_line` works on pydevd only.** The platform has no language-agnostic
   "set next statement" API, and the tool reaches `PyDebugProcess.startSetNextStatement`
   reflectively. PyCharm's debugpy backend (the default for local Python 3.9+ interpreters since
