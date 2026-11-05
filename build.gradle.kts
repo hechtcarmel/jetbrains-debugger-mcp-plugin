@@ -211,6 +211,7 @@ intellijPlatform {
 
 // Configure Gradle Changelog Plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin
 changelog {
+    versionPrefix.set("") // Git tags use bare versions without a "v" prefix.
     groups.empty()
     repositoryUrl = providers.gradleProperty("pluginRepositoryUrl")
 }
