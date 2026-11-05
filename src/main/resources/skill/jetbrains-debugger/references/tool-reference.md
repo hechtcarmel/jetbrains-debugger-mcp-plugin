@@ -42,6 +42,46 @@ List all active debug sessions.
 
 **Returns:** `sessions[]` (id, name, state, isCurrent, runConfigurationName), `currentSessionId`, `totalCount`
 
+### `list_android_processes`
+List running Android processes visible to the IDE debugger. Requires the Android plugin and a connected device.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_path` | string | No | Project path |
+| `device_serial` | string | No | Exact device serial to filter by |
+
+**Returns:** `processes[]` with `deviceSerial`, `processId`, `processName` (nullable), `debuggerAttached`.
+
+### `attach_android_debugger`
+Attach the IDE's Android debugger to a running Android app process without a chooser or installation.
+Requires the Android plugin and a connected Android device or emulator.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_path` | string | No | Project path |
+| `process_id` | integer | Or use process_name | Positive Android PID |
+| `process_name` | string | Or use process_id | Exact Android process name including any :subprocess suffix |
+| `device_serial` | string | No | Exact Android device serial; needed when multiple devices match |
+| `debugger_id` | string | No | Android debugger ID, default `Java` for Java/Kotlin |
+
+**Returns:** `status` (`started`), `session` (DebugSessionInfo including the Android `processId`), `message`.
+
+Discover targets with `list_android_processes`. Both name and PID must match if both are supplied.
+Ambiguous or missing targets return `isError: true` with candidates. Attachment returns the
+Android API's session directly and reuses an existing session in the same project. A debugger
+owned by another project or client is an error. Only processes exposed by the IDE debugger are
+listed; `processName` may be null, in which case select by PID. An empty process list is successful;
+unready ADB returns a retryable error.
+
+New attachments use default debugger state and do not inherit a run configuration's LLDB startup
+commands or symbol directories. To apply those settings, use the IDE's
+[Attach Debugger to Android Process](https://developer.android.com/studio/debug#attach-debugger)
+workflow with the option to reuse that configuration, then discover the session with `list_debug_sessions`.
+
+Android is optional. Missing plugins, dependencies or incompatible APIs produce tool errors while
+other tools remain available. Fall back to the IDE's **Attach Debugger to Android Process** action,
+then use `list_debug_sessions` and the standard inspection/execution tools.
+
 ### `start_debug_session`
 Start a new debug session for a run configuration.
 

@@ -13,6 +13,7 @@ Set breakpoints, step through code, inspect variables, and evaluate expressionsâ
 <h3>Debug Session Management</h3>
 <ul>
     <li><b>Start/Stop Debug Sessions</b> - Launch any run configuration in debug mode</li>
+    <li><b>Android Process Attachment</b> - Discover and attach to running Android apps (optional Android plugin)</li>
     <li><b>Session Status</b> - Get comprehensive debug state in a single call including variables, stack trace, and source context</li>
     <li><b>Multi-Session Support</b> - Manage multiple concurrent debug sessions</li>
 </ul>
@@ -102,6 +103,13 @@ for detailed documentation and examples.</p>
     <depends>com.intellij.modules.xdebugger</depends>
     <!-- Optional Java debugger support -->
     <depends optional="true" config-file="java-debugger.xml">com.intellij.java</depends>
+    <depends optional="true" config-file="com.github.hechtcarmel.jetbrainsdebuggermcpplugin-android-debugger.xml">org.jetbrains.android</depends>
+
+    <extensionPoints>
+        <extensionPoint name="androidAttachBackend"
+                        interface="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.AndroidAttachBackend"
+                        dynamic="true"/>
+    </extensionPoints>
 
     <!-- Services (McpServerService, McpSettings, CommandHistoryService) are registered solely
          via the @Service annotation (light services); registering them here too would make the

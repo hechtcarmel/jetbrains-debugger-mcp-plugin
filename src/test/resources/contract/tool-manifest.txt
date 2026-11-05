@@ -1,7 +1,53 @@
 # MCP tool manifest — golden snapshot
 # Snapshot of the SDK Tool as serialized to clients, not of the authored schema.
 # Regenerate: ./gradlew test --tests "*ToolManifestContractTest" -Dcontract.update=true
-# tools: 25
+# tools: 27
+
+## attach_android_debugger
+description:
+  Attaches the IDE's Android debugger to an existing Android app process and returns the session ID, without installing or launching the app or opening a process chooser.
+  Call list_android_processes first, then supply process_name or process_id and device_serial when needed. Names match exactly, including :subprocess suffixes. Both selectors, when supplied, must match; ambiguous targets return an error listing candidates.
+  Requires the Android plugin and a connected Android device or emulator. Defaults to Android's Java/Kotlin debugger (debugger_id: Java); other debugger IDs depend on installed Android debuggers.
+  New attachments use default debugger state and do not inherit a run configuration's LLDB startup commands or symbol directories. An existing matching debug session in the same project may be reused.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Attach Android Debugger"
+  }
+inputSchema:
+  {
+    "properties": {
+      "debugger_id": {
+        "default": "Java",
+        "description": "Android debugger ID; defaults to Java for Java/Kotlin. Other IDs depend on installed Android debuggers.",
+        "type": "string"
+      },
+      "device_serial": {
+        "description": "Exact Android device serial; required when the process selector matches multiple devices",
+        "type": "string"
+      },
+      "process_id": {
+        "description": "PID of the running Android process; required unless process_name is supplied",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "process_name": {
+        "description": "Exact Android process name including any :subprocess suffix; required unless process_id is supplied",
+        "type": "string"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
 
 ## evaluate_expression
 description:
@@ -732,6 +778,36 @@ inputSchema:
       "file_path",
       "line"
     ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## list_android_processes
+description:
+  Lists running Android processes visible to the IDE debugger, with device serial, PID, process name and attachment state.
+  Use process_name or process_id and device_serial with attach_android_debugger to attach to a running Android app without installing or launching it or opening the process chooser. Requires the Android plugin and a connected Android device or emulator.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "List Android Processes"
+  }
+inputSchema:
+  {
+    "properties": {
+      "device_serial": {
+        "description": "Optional exact Android device serial to filter the process list",
+        "type": "string"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [],
     "type": "object"
   }
 outputSchema:

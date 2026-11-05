@@ -3,7 +3,7 @@ name: jetbrains-debugger
 description: >-
   Guide for using JetBrains IDE Debugger MCP tools to programmatically debug applications.
   TRIGGER when ANY of these MCP tools are available: list_run_configurations, execute_run_configuration,
-  start_debug_session, stop_debug_session, get_debug_session_status, get_console_output, list_debug_sessions,
+  start_debug_session, stop_debug_session, get_debug_session_status, get_console_output, list_debug_sessions, list_android_processes, attach_android_debugger,
   set_breakpoint, remove_breakpoint, list_breakpoints, resume_execution, pause_execution,
   step_over, step_into, step_out, run_to_line, jump_to_line, wait_for_pause, get_stack_trace, select_stack_frame,
   list_threads, get_variables, set_variable, get_source_context, evaluate_expression.
@@ -32,9 +32,18 @@ Use these tools to **actually debug** applications in a JetBrains IDE rather tha
 **DON'T use the debugger when:**
 - The bug is a clear syntax error, typo, or missing import
 - The fix is obvious from reading the code (e.g., off-by-one, wrong operator)
-- There's no run configuration available to debug
+- There's no run configuration or running Android process available to debug
 
 ## Core Workflow
+
+For an already running Android app, call `list_android_processes` and
+`attach_android_debugger` with its exact process name or PID and device serial. These tools
+require the optional Android plugin, a compatible attach API and a connected Android device or emulator.
+New attachments use default debugger state. For a run configuration's LLDB startup commands or
+symbol directories, use the IDE's **Attach Debugger to Android Process** action with the option to
+reuse that configuration, then discover the session with `list_debug_sessions`.
+If automatic attachment is unavailable, attach through the IDE's **Attach Debugger to Android Process**
+action and discover the session with `list_debug_sessions`.
 
 ### Standard Debugging Sequence
 

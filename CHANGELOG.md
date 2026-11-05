@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`list_android_processes` tool** - Lists running Android processes by device serial, PID and exact process name.
+- **`attach_android_debugger` tool** - Attaches to a running Android process by name or PID without installation, launch or a process chooser. Supports device selection and debugger IDs; Java/Kotlin is the default. Android support is optional: missing dependencies or incompatible APIs return tool errors while existing tools remain available.
+
 ## [5.3.0] - 2026-10-30
 
 ### Added

@@ -153,10 +153,10 @@ class ToolRegistryTest {
     }
 
     @Test
-    fun `registerBuiltInTools registers exactly 25 tools`() {
+    fun `registerBuiltInTools registers exactly 27 tools`() {
         registry.registerBuiltInTools()
 
-        assertEquals(25, registry.getToolCount())
+        assertEquals(27, registry.getToolCount())
     }
 
     @Test
@@ -167,7 +167,9 @@ class ToolRegistryTest {
         assertNotNull(registry.getTool("list_run_configurations"))
         assertNotNull(registry.getTool("execute_run_configuration"))
 
-        // Debug Session Tools (5)
+        // Debug Session Tools (7)
+        assertNotNull(registry.getTool("list_android_processes"))
+        assertNotNull(registry.getTool("attach_android_debugger"))
         assertNotNull(registry.getTool("list_debug_sessions"))
         assertNotNull(registry.getTool("start_debug_session"))
         assertNotNull(registry.getTool("stop_debug_session"))

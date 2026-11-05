@@ -5,7 +5,7 @@
 # change for every MCP client. 'optional' means the property has a Kotlin default;
 # production serializes with encodeDefaults=true, so optional fields are still
 # emitted. StreamableHttpTransportTest pins the bytes actually sent to a client.
-# shapes: 28
+# shapes: 30
 
 ## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandEntryExport
 kind: CLASS
@@ -258,3 +258,14 @@ kind: CLASS
   sourceContext: CLASS [nullable,optional]
   currentThread: CLASS [nullable,optional]
   threadCount: INT [optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.AndroidProcessInfo
+kind: CLASS
+  deviceSerial: STRING [required,non-null]
+  processId: INT [required,non-null]
+  processName: STRING [nullable]
+  debuggerAttached: BOOLEAN [required,non-null]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.AndroidProcessListResult
+kind: CLASS
+  processes: LIST [required,non-null]
