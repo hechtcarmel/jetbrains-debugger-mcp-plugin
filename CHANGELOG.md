@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-11-05
+
 ### Added
 
 - **`list_android_processes` tool** - Lists running Android processes by device serial, PID and exact process name.
@@ -298,8 +300,9 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.3.0...HEAD
-[5.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.2.0...5.3.0
+[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.4.0...HEAD
+[5.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.3.0...v5.4.0
+[5.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.1.0...v5.2.0
 [5.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.2...v5.1.0
 [5.0.2]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v5.0.1...v5.0.2
