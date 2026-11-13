@@ -209,7 +209,9 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         val id = service.scheduled(env)!!
         val handler = Handler().apply { startNotify() }
         val view = console("owned output\n")
-        val descriptor = RunContentDescriptor(view, handler, view.component, "event order")
+        val descriptor = RunContentDescriptor(view, handler, view.component, "event order").apply {
+            executionId = env.executionId
+        }
         Disposer.register(testRootDisposable, descriptor)
         service.observed(descriptor)
         assertEquals(listOf(id), service.list().sessions.map { it.id })
@@ -217,6 +219,108 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         service.observed(descriptor)
         assertEquals(listOf(id), service.list().sessions.map { it.id })
         assertEquals("owned output\n", service.read(id, 100, 0, 100).console!!.output)
+    }
+
+    fun `test pre existing observed process keeps its id on termination event`() {
+        val env = environment("pre existing")
+        val handler = Handler().apply { startNotify() }
+        val view = console("retained\n")
+        val descriptor = RunContentDescriptor(view, handler, view.component, "pre existing")
+        Disposer.register(testRootDisposable, descriptor)
+        service.observed(descriptor)
+        val observed = service.list().sessions.single().id
+        handler.finish(9)
+        service.terminated(env, handler, 9)
+        assertEquals(listOf(observed), service.list().sessions.map { it.id })
+        assertEquals(9, service.session(observed).exitCode)
+        assertEquals("retained\n", service.read(observed, 100, 0, 100).console!!.output)
+    }
+
+    fun `test callback only bound start notified process advances lifecycle`() {
+        val id = service.reserve("callback only")
+        val handler = Handler()
+        val view = console("callback output\n")
+        val descriptor = RunContentDescriptor(view, handler, view.component, "callback only")
+        Disposer.register(testRootDisposable, descriptor)
+        service.bindDescriptor(id, descriptor)
+        assertEquals("starting", service.session(id).state)
+        handler.startNotify()
+        assertEquals("running", service.session(id).state)
+        service.failed(id, "late startup failure")
+        assertEquals("failed_start", service.session(id).state)
+    }
+
+    fun `test zero id early observation reconciles to reserved id without losing the observed id`() {
+        val env = environment("legacy runner")
+        val reserved = service.scheduled(env)!!
+        val handler = Handler().apply { startNotify() }
+        val view = console("legacy output\n")
+        val descriptor = RunContentDescriptor(view, handler, view.component, "legacy")
+        Disposer.register(testRootDisposable, descriptor)
+        assertEquals(0L, descriptor.executionId)
+        service.observed(descriptor)
+        val provisional = service.list().sessions.single { it.id != reserved }.id
+        service.started(env, handler)
+        assertEquals(listOf(reserved), service.list().sessions.map { it.id })
+        assertEquals("legacy output\n", service.read(reserved, 100, 0, 100).console!!.output)
+        assertEquals(reserved, service.session(provisional).id)
+        assertEquals(reserved, service.read(provisional, 100, 0, 100).console!!.sessionId)
+        // Delayed callbacks may still carry the originally observed ID.
+        service.failed(provisional, "late diagnostic")
+        assertEquals("late diagnostic", service.session(reserved).failureMessage)
+        env.putUserData(RunSessionService.SESSION_KEY, provisional)
+        assertEquals(reserved, service.scheduled(env))
+        service.bindDescriptor(provisional, descriptor)
+        val stopped = service.stop(provisional)
+        assertEquals(reserved, stopped.sessionId)
+        assertEquals("stopping", stopped.status)
+        assertEquals(1, handler.stopCount)
+    }
+
+    fun `test identity budget preserves active aliases and prunes them on canonical eviction`() {
+        val otherEnv = environment("other live process")
+        val otherHandler = Handler().apply { startNotify() }
+        service.started(otherEnv, otherHandler)
+        val otherId = service.list().sessions.single().id
+        val handler = Handler().apply { startNotify() }
+        val view = console("shared process\n")
+        val descriptor = RunContentDescriptor(view, handler, view.component, "observed")
+        Disposer.register(testRootDisposable, descriptor)
+        service.observed(descriptor)
+        val identities = mutableListOf(service.list().sessions.single { it.id != otherId }.id)
+        repeat(RunSessionService.MAX_SESSIONS - 2) {
+            val env = environment("same process callback $it")
+            val id = service.scheduled(env)!!
+            service.started(env, handler)
+            identities.add(id)
+        }
+        assertEquals(2, service.list().sessions.size)
+        identities.forEach { assertEquals(identities.last(), service.session(it).id) }
+        assertNull(service.scheduled(environment("over identity capacity")))
+        assertTrue(service.list().trackingLimitReached)
+        identities.forEach { assertEquals(identities.last(), service.session(it).id) }
+        handler.finish(0)
+        service.reserve("replacement")
+        identities.forEach {
+            try { service.session(it); fail("Evicted aliases must not survive") }
+            catch (e: ToolExecutionError) { assertTrue(e.message!!.contains("metadata evicted")) }
+        }
+        assertEquals("running", service.session(otherId).state)
+        assertTrue("Missed launch warning is historical", service.list().trackingLimitReached)
+    }
+
+    fun `test unrelated pending start does not hide a selected existing Run session`() {
+        val pending = service.scheduled(environment("pending runner"))!!
+        val handler = Handler().apply { startNotify() }
+        val view = console("existing output\n")
+        val descriptor = RunContentDescriptor(view, handler, view.component, "existing")
+        Disposer.register(testRootDisposable, descriptor)
+        service.observed(descriptor)
+        val sessions = service.list().sessions
+        assertEquals(2, sessions.size)
+        val existing = sessions.single { it.id != pending }
+        assertEquals("existing output\n", service.read(existing.id, 100, 0, 100).console!!.output)
+        assertEquals("starting", service.session(pending).state)
     }
 
     fun `test execution listener captures asynchronous start failure`() {

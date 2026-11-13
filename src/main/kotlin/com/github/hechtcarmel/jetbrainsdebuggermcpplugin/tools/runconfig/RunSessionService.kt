@@ -41,6 +41,9 @@ class RunSessionService(private val project: Project) : Disposable {
     }
 
     private val entries = LinkedHashMap<String, Entry>()
+    // Preserve an observed ID when its exact process later claims a reserved launch ID.
+    // Values always point directly to canonical entries; aliases never retain IDE objects.
+    private val aliases = LinkedHashMap<String, String>()
     private var trackingLimitReached = false
     @Volatile private var disposed = false
 
@@ -57,12 +60,13 @@ class RunSessionService(private val project: Project) : Disposable {
     internal fun reserve(name: String): String {
         assertEdt()
         refresh()
-        if (entries.size >= MAX_SESSIONS) {
+        if (entries.size + aliases.size >= MAX_SESSIONS) {
             val oldestFinished = entries.values.firstOrNull {
                 it.state in setOf("terminated", "failed_start", "unavailable") && it.handler?.get()?.isProcessTerminated != false
             }
                 ?: throw ToolExecutionError("Run session tracking limit reached ($MAX_SESSIONS). No configuration was launched.")
             entries.remove(oldestFinished.id)
+            aliases.entries.removeIf { it.value == oldestFinished.id }
         }
         val id = "run:${UUID.randomUUID()}"
         entries[id] = Entry(id, name.take(512))
@@ -72,9 +76,11 @@ class RunSessionService(private val project: Project) : Disposable {
     internal fun scheduled(env: ExecutionEnvironment): String? {
         assertEdt()
         val existing = env.getUserData(SESSION_KEY)
-        if (existing != null && entries.containsKey(existing)) {
-            entries.getValue(existing).executionId = env.executionId
-            return existing
+        val existingEntry = existing?.let(::entryForId)
+        if (existingEntry != null) {
+            existingEntry.executionId = env.executionId
+            env.putUserData(SESSION_KEY, existingEntry.id)
+            return existingEntry.id
         }
         val id = try { reserve(env.runProfile.name) } catch (_: ToolExecutionError) {
             trackingLimitReached = true
@@ -93,6 +99,11 @@ class RunSessionService(private val project: Project) : Disposable {
     }
 
     internal fun started(env: ExecutionEnvironment, handler: ProcessHandler) {
+        val observed = entries.values.firstOrNull { it.handler?.get() === handler }
+        if (env.getUserData(SESSION_KEY)?.let(::entryForId) == null && observed != null) {
+            // UI-discovered processes already have an externally visible identity.
+            env.putUserData(SESSION_KEY, observed.id)
+        }
         val id = scheduled(env) ?: return
         val entry = entries.getValue(id)
         // A grouped/delegated launch can expose several handlers under one environment.
@@ -105,6 +116,7 @@ class RunSessionService(private val project: Project) : Disposable {
                 return
             }
         } else entry
+        reconcileObserved(target, handler)
         target.handler = WeakReference(handler)
         target.state = if (handler.isProcessTerminated) "terminated" else "running"
         target.exitCode = handler.exitCode
@@ -113,7 +125,7 @@ class RunSessionService(private val project: Project) : Disposable {
 
     internal fun failed(id: String, reason: String?) {
         assertEdt()
-        entries[id]?.apply {
+        entryForId(id)?.apply {
             state = "failed_start"
             failure = (reason ?: "Execution was cancelled or failed before a process started").take(MAX_DIAGNOSTIC_CHARS)
         }
@@ -144,10 +156,11 @@ class RunSessionService(private val project: Project) : Disposable {
     /** The runner callback binds a descriptor to the launch, without guessing a batch ID. */
     internal fun bindDescriptor(id: String, descriptor: RunContentDescriptor) {
         assertEdt()
-        val entry = entries[id] ?: return
+        val entry = entryForId(id) ?: return
         val handler = descriptor.processHandler
         val previous = entry.handler?.get()
         if (previous != null && handler !== previous) return
+        if (handler != null) reconcileObserved(entry, handler)
         // Explicit descriptor reuse invalidates old processless ownership before binding anew.
         entries.values.filter { it !== entry && it.descriptor?.get() === descriptor }.forEach {
             it.descriptor = null
@@ -166,7 +179,12 @@ class RunSessionService(private val project: Project) : Disposable {
         val known = entries.values.firstOrNull { it.handler?.get() === handler }
         // showRunContent/contentSelected can precede processStarted. Let the scheduled
         // execution claim its handler, retaining the ID already returned to the caller.
-        if (known == null && entries.values.any { it.state == "starting" }) return
+        // Execution IDs only delay discovery for this launch's event ordering; they
+        // never establish console ownership (which still requires the exact handler).
+        // An unrelated stuck startup must not hide every selected existing Run tab.
+        if (known == null && descriptor.executionId != 0L && entries.values.any {
+                it.state == "starting" && it.executionId == descriptor.executionId
+            }) return
         val entry = known ?: run {
             val id = try { reserve(descriptor.displayName ?: "Run") } catch (_: ToolExecutionError) {
                 trackingLimitReached = true
@@ -201,7 +219,7 @@ class RunSessionService(private val project: Project) : Disposable {
         if (console == null) return RunConsoleOutputResult(info(entry), consoleError =
             "No retained text console is available for this exact Run session. See state and failureMessage; no other session was selected.")
         return try {
-            RunConsoleOutputResult(info(entry), ConsoleOutputReader.read(console, id, lines, offset, maxChars))
+            RunConsoleOutputResult(info(entry), ConsoleOutputReader.read(console, entry.id, lines, offset, maxChars))
         } catch (e: ToolExecutionError) {
             RunConsoleOutputResult(info(entry), consoleError = e.message.take(MAX_DIAGNOSTIC_CHARS))
         } catch (e: CancellationException) {
@@ -218,17 +236,32 @@ class RunSessionService(private val project: Project) : Disposable {
         val entry = requireEntry(id)
         val handler = entry.handler?.get()
         if (handler == null || handler.isProcessTerminated) {
-            return StopSessionResult(id, "not_running", "This Run session has no running process; no process was stopped")
+            return StopSessionResult(entry.id, "not_running", "This Run session has no running process; no process was stopped")
         }
         // Never search by configuration name, PID, focused tab or execution-id batch.
         if (!handler.isProcessTerminating) handler.destroyProcess()
         entry.state = "stopping"
-        return StopSessionResult(id, "stopping", "Stop requested for this exact Run session")
+        return StopSessionResult(entry.id, "stopping", "Stop requested for this exact Run session")
     }
+
+    private fun reconcileObserved(target: Entry, handler: ProcessHandler) {
+        val provisional = entries.values.firstOrNull { it !== target && it.handler?.get() === handler } ?: return
+        if (target.descriptor?.get()?.processHandler !== handler) {
+            target.descriptor = provisional.descriptor
+        }
+        target.processlessConsole = target.processlessConsole ?: provisional.processlessConsole
+        entries.remove(provisional.id)
+        aliases.entries.filter { it.value == provisional.id }.forEach { it.setValue(target.id) }
+        aliases[provisional.id] = target.id
+        // One provisional record became one alias, so the combined identity budget
+        // is unchanged. Never discard an already-exposed live identity to make room.
+    }
+
+    private fun entryForId(id: String): Entry? = entries[id] ?: aliases[id]?.let(entries::get)
 
     private fun requireEntry(id: String): Entry {
         if (!id.startsWith("run:")) throw ToolExecutionError("Expected a Run session ID from list_run_sessions, not a Debug session ID")
-        return entries[id] ?: throw ToolExecutionError("Run session not found or metadata evicted: $id")
+        return entryForId(id) ?: throw ToolExecutionError("Run session not found or metadata evicted: $id")
     }
 
     private fun attachDescriptor(entry: Entry) {
@@ -264,6 +297,7 @@ class RunSessionService(private val project: Project) : Disposable {
                     if (entry.state != "failed_start") entry.state = "terminated"
                     entry.exitCode = handler.exitCode
                 } else if (handler.isProcessTerminating && entry.state != "failed_start") entry.state = "stopping"
+                else if (entry.state == "starting" && handler.isStartNotified) entry.state = "running"
             } else if (entry.state in setOf("running", "stopping")) entry.state = "unavailable"
         }
     }

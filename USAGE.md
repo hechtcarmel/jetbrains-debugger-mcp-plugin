@@ -26,7 +26,9 @@ remain in `list_debug_sessions`, with their existing IDs and behavior. Every Run
 requires an exact Run ID; no name, PID, focused tab or current-session fallback is used.
 `project_path` follows the usual multi-project selection rules.
 
-The result contains `sessions`, `trackingLimitReached` and `maxSessions` (128 per project).
+The result contains `sessions`, `trackingLimitReached` and `maxSessions` (128 identities per project,
+including aliases retained when early UI discovery is reconciled with a launch response).
+Discovery lists canonical sessions once; reads/stops accept either identity and return the canonical ID.
 Each session contains `id`, `configurationName`, `mode` (`run`), `state`, nullable `exitCode`
 and `failureMessage`, and `consoleAvailable` (a retained ConsoleView exists; reading may
 still report an unsupported text view). States are `starting`, `running`, `stopping`,
@@ -40,7 +42,8 @@ plugin keeps bounded metadata and weak references to IDE-owned processes/console
 output listener or duplicate log buffer. Oldest finished metadata is evicted first; tracked
 active/pending executions are not evicted to start a new one. At capacity, a new tool launch
 fails before launching. `trackingLimitReached` signals that an external launch could not be
-tracked. IDs and metadata are local to this IDE/project lifetime.
+tracked. This warning is latched for the project lifetime: recovering capacity does not recover
+missed launch history. IDs and metadata are local to this IDE/project lifetime.
 
 ### get_run_console_output
 
