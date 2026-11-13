@@ -179,6 +179,7 @@ class ConsoleOutputReaderTest : BasePlatformTestCase() {
             override fun isBuildContentView() = false
         }
         val build = BuildView(project, process, DefaultBuildDescriptor("test", "Gradle", project.basePath!!, 0), null, manager)
+        Disposer.register(testRootDisposable, build)
         build.addView(process, "consoleView")
         build.addView(tree, "buildTree")
         build.showView("buildTree", false)

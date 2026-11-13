@@ -14,7 +14,6 @@ import com.intellij.execution.filters.TextConsoleBuilderFactory
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.execution.ui.ConsoleViewContentType
 import com.intellij.execution.ui.RunContentDescriptor
-import com.intellij.execution.ui.RunContentManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -84,11 +83,11 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         val handler = Handler().apply { startNotify() }
         val view = console(text)
         val descriptor = RunContentDescriptor(view, handler, view.component, name)
-        RunContentManager.getInstance(project).showRunContent(DefaultRunExecutor.getRunExecutorInstance(), descriptor)
-        Disposer.register(testRootDisposable) {
-            RunContentManager.getInstance(project).removeRunContent(DefaultRunExecutor.getRunExecutorInstance(), descriptor)
-        }
+        Disposer.register(testRootDisposable, descriptor)
         service.started(env, handler)
+        // showRunContent is a no-op in IDE unit-test mode. Simulate the exact
+        // descriptor binding performed by the production runner callback.
+        service.bindDescriptor(id, descriptor)
         return Triple(id, handler, descriptor)
     }
 
@@ -97,7 +96,9 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         val (otherId, otherHandler) = start("two", "foreign output\n")
         assertTrue(id.startsWith("run:"))
         assertFalse(id == otherId)
-        val page = service.read(id, 1, 1, 100).console!!
+        val result = service.read(id, 1, 1, 100)
+        assertNotNull(result.consoleError, result.console)
+        val page = result.console!!
         assertEquals("two\n", page.output)
         assertEquals(3, page.totalLines)
         assertEquals("running", service.session(id).state)
@@ -109,7 +110,12 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         assertEquals("not_running", service.stop(id).status)
         val console = descriptor.executionConsole as ConsoleView
         console.clear()
-        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
+        // Clearing ConsoleView is asynchronous, just like rendering new output.
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+        while (service.read(id, 100, 0, 100).console!!.output.isNotEmpty() && System.nanoTime() < deadline) {
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
+            Thread.sleep(10)
+        }
         assertEquals("", service.read(id, 100, 0, 100).console!!.output)
     }
 
@@ -162,10 +168,7 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         val id = service.scheduled(env)!!
         val view = console("startup diagnostic\n")
         val descriptor = RunContentDescriptor(view, null, view.component, "failed").apply { executionId = env.executionId }
-        RunContentManager.getInstance(project).showRunContent(DefaultRunExecutor.getRunExecutorInstance(), descriptor)
-        Disposer.register(testRootDisposable) {
-            RunContentManager.getInstance(project).removeRunContent(DefaultRunExecutor.getRunExecutorInstance(), descriptor)
-        }
+        Disposer.register(testRootDisposable, descriptor)
         service.failed(env, "Cannot create process")
         assertNull("Execution IDs alone are not exact ownership", service.read(id, 100, 0, 100).console)
         service.bindDescriptor(id, descriptor)

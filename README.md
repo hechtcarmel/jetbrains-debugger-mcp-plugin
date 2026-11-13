@@ -232,7 +232,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ## Available Tools
 
-The plugin provides **27 MCP tools** organized by category:
+The plugin provides **30 MCP tools** organized by category:
 
 ### Run Configuration Tools
 
@@ -240,6 +240,9 @@ The plugin provides **27 MCP tools** organized by category:
 |------|-------------|
 | `list_run_configurations` | List all available run configurations in the project |
 | `execute_run_configuration` | Execute a run configuration in debug or run mode |
+| `list_run_sessions` | List tracked ordinary Run sessions and their lifecycle status |
+| `stop_run_session` | Stop only the process owned by the selected Run session |
+| `get_run_console_output` | Read a bounded page from the selected Run session’s retained console |
 
 ### Debug Session Tools
 
