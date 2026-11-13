@@ -1,6 +1,6 @@
 # Debugger MCP Server - Tool Reference
 
-This document provides detailed documentation for all 27 MCP tools available in the JetBrains Debugger MCP Server plugin.
+This document provides detailed documentation for all 30 MCP tools available in the JetBrains Debugger MCP Server plugin.
 
 In **Settings > Tools > Debugger MCP Server**, use **Exposed tools** to enable or disable individual tools. All are enabled by default. Disabled tools are omitted from `tools/list` and cannot be called. Changes apply to existing connections and emit a tool-list change notification; clients that cache the list may need to refresh or reconnect. Calls already in progress continue. The selection applies across projects and debugger backends; it does not detect backend capabilities automatically.
 
@@ -8,14 +8,77 @@ In **Settings > Tools > Debugger MCP Server**, use **Exposed tools** to enable o
 
 Tools are organized into categories based on functionality:
 
-### Run Configuration Tools (2)
+### Run Configuration Tools (5)
 
 | Tool | Description |
 |------|-------------|
 | `list_run_configurations` | List all available run configurations |
 | `execute_run_configuration` | Execute a run configuration in run or debug mode |
+| `list_run_sessions` | Discover ordinary Run executions and lifecycle diagnostics |
+| `get_run_console_output` | Read bounded retained output from an exact Run session |
+| `stop_run_session` | Stop only the requested Run session |
 
-### Debug Session Tools (7)
+#### list_run_sessions
+
+Lists ordinary **Run** executions observed by the plugin, including IDE UI launches and
+`execute_run_configuration` with `mode: "run"`. Run IDs start with `run:`. Debug sessions
+remain in `list_debug_sessions`, with their existing IDs and behavior. Every Run read/stop
+requires an exact Run ID; no name, PID, focused tab or current-session fallback is used.
+`project_path` follows the usual multi-project selection rules.
+
+The result contains `sessions`, `trackingLimitReached` and `maxSessions` (128 per project).
+Each session contains `id`, `configurationName`, `mode` (`run`), `state`, nullable `exitCode`
+and `failureMessage`, and `consoleAvailable` (a retained ConsoleView exists; reading may
+still report an unsupported text view). States are `starting`, `running`, `stopping`,
+`failed_start`, `terminated` and `unavailable`. `starting` only confirms that execution was
+requested. `failed_start` preserves the startup error even when no process/console was created.
+A terminated process can have a nonzero exit code and retained failure output.
+
+Events are tracked from plugin activation, and already-open Run tabs are observed when selected.
+An unobserved tab is not guessed from its title or assigned an executor based on focus. The
+plugin keeps bounded metadata and weak references to IDE-owned processes/consoles, with no
+output listener or duplicate log buffer. Oldest finished metadata is evicted first; tracked
+active/pending executions are not evicted to start a new one. At capacity, a new tool launch
+fails before launching. `trackingLimitReached` signals that an external launch could not be
+tracked. IDs and metadata are local to this IDE/project lifetime.
+
+### get_run_console_output
+
+Reads only the required `session_id` from `list_run_sessions` or the Run-mode execution
+response. Optional `lines` defaults to 100 (1–1000), `offset` to 0 (nonnegative) and
+`max_chars` to 20000 (1–100000 UTF-16 characters). `offset` skips newest retained lines to
+page backward: use `lines: 100, offset: 100` for the preceding page of unchanged history.
+
+Returns `{ "session": {...}, "console": {...} | null, "consoleError": string | null }`.
+`session` always includes lifecycle/failure diagnostics. An unavailable console is explicit;
+it does not mean startup succeeded. `console`, when present, has the same bounded page fields
+as `get_console_output`: `sessionId`, `output`, `totalLines`, `startLine`, `endLine`, `hasMore`,
+`truncated`, `hasDeferredOutput`, and `outputPaused`.
+
+Text remains in original order. Character limits retain the end of the selected page without
+splitting a surrogate pair. Line positions are relative to the currently retained IDE history,
+not durable cursors. Clear, cyclic eviction, tab closure/reuse and metadata eviction can remove
+history; it cannot be recovered. Closed/reused tabs never redirect an old ID to newer output.
+Terminated sessions remain readable while their exact console is retained. Reads do not launch,
+stop, pause, flush, send input, unpause output or change the selected console view. Language
+console input is excluded; duplex and Gradle build composites select the process console.
+
+### stop_run_session
+
+Requires an exact `session_id` from Run discovery; Debug IDs are rejected. Requests termination
+only on that session's process handler. Returns `sessionId`, `status` and `message`.
+`stopping` confirms the stop request, not process exit; inspect discovery afterward.
+`not_running` means there is no process to stop (including a still-pending start); it does not
+cancel pending startup and must not be interpreted as successful execution. It never stops a
+process by matching its configuration name or falls back to another session.
+
+**Run workflow:** `execute_run_configuration(name="Application", mode="run")` → inspect its
+`sessionId` with `get_run_console_output` / `list_run_sessions` → `stop_run_session` with that
+same ID when needed. Do not pass this ID to debugger stepping, evaluation or stop tools.
+
+---
+
+## Debug Session Tools (7)
 
 | Tool | Description |
 |------|-------------|
@@ -83,6 +146,9 @@ Tools are organized into categories based on functionality:
 - [Run Configuration Tools](#run-configuration-tools)
   - [list_run_configurations](#list_run_configurations)
   - [execute_run_configuration](#execute_run_configuration)
+  - [list_run_sessions](#list_run_sessions)
+  - [get_run_console_output](#get_run_console_output)
+  - [stop_run_session](#stop_run_session)
 - [Debug Session Tools](#debug-session-tools)
   - [list_debug_sessions](#list_debug_sessions)
   - [list_android_processes](#list_android_processes)
@@ -650,7 +716,7 @@ Example arguments: `{"lines":100,"offset":0}`. To read the preceding page, use `
 
 Console rendering is asynchronous. `hasDeferredOutput` reports text still queued in the IDE; read again later to include it. `outputPaused` reports the user's console rendering setting, which reading leaves unchanged. Clearing the console and the IDE's cyclic output buffer can remove history, so these line numbers and offsets are **not durable polling cursors**, and pages can shift while output grows.
 
-Standard text consoles and language-console output history are supported. Language-console **unsubmitted input is excluded**. For duplex consoles, the primary console is read regardless of which view is selected. A console without accessible text returns an explicit error. Only sessions resolvable by `list_debug_sessions` are supported; plain Run configurations, terminals, and sessions already removed from the debugger manager are outside this tool's scope. No separate log store is created.
+Standard text consoles and language-console output history are supported. Language-console **unsubmitted input is excluded**. For duplex consoles, the primary console is read regardless of which view is selected. Gradle build composites read their process console rather than the selected build-tree details. A console without accessible text returns an explicit error. Only sessions resolvable by `list_debug_sessions` are supported; plain Run configurations, terminals, and sessions already removed from the debugger manager are outside this tool's scope. No separate log store is created.
 
 ---
 

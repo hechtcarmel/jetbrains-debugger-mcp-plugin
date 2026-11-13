@@ -31,7 +31,30 @@ Execute a run configuration in debug or run mode.
 | `name` | string | **Yes** | | Configuration name (exact match) |
 | `mode` | string | No | `"debug"` | `"debug"` or `"run"` |
 
-**Returns:** `status`, `configurationName`, `mode`, `message`, `sessionId` (null in `run` mode — no debugger attaches)
+**Returns:** `status`, `configurationName`, `mode`, `message`, `sessionId` (`run:` ID in Run mode). Run status is `starting` until lifecycle events confirm startup; `failed_start` preserves the failure message. Debug behavior is unchanged.
+
+### `list_run_sessions`
+
+Lists ordinary Run executions with `run:` IDs and lifecycle/exit/failure metadata, including
+terminated or failed starts. Optional `project_path`. Returns `sessions`, `trackingLimitReached`,
+and `maxSessions` (128). Oldest finished metadata is evicted first. Active metadata is not
+evicted to start another configuration. Existing tabs are observed when selected; executor
+identity is supplied by IDE events rather than guessed. No duplicate output store is kept.
+
+### `get_run_console_output`
+
+Requires `session_id` (exact `run:` ID); optional `project_path`, `lines` (100, max 1000),
+`offset` (0, nonnegative), `max_chars` (20000, max 100000). Returns `session` diagnostics plus
+`console` (the same page fields as `get_console_output`) or `consoleError`. `starting` and
+missing output are never successful-start evidence. Offsets skip newest retained lines.
+Cleared/cyclic output is unrecoverable; closing/reusing a tab cannot redirect the old ID.
+
+### `stop_run_session`
+
+Requires the exact `run:` session ID, optional `project_path`. Stops only its handler.
+Returns `stopping` for a requested stop or `not_running` when there is no process to stop.
+This does not cancel a still-pending start. Inspect discovery for completion. Debug IDs
+are rejected; name/PID/focus matching is never used.
 
 ### `list_debug_sessions`
 List all active debug sessions.
@@ -161,7 +184,7 @@ Example arguments: `{"lines":100,"offset":0}`. To read the preceding page, use `
 
 Console rendering is asynchronous. `hasDeferredOutput` reports text still queued in the IDE; read again later to include it. `outputPaused` reports the user's console rendering setting, which reading leaves unchanged. Clearing the console and the IDE's cyclic output buffer can remove history, so these line numbers and offsets are **not durable polling cursors**, and pages can shift while output grows.
 
-Standard text consoles and language-console output history are supported. Language-console **unsubmitted input is excluded**. For duplex consoles, the primary console is read regardless of which view is selected. A console without accessible text returns an explicit error. Only sessions resolvable by `list_debug_sessions` are supported; plain Run configurations, terminals, and sessions already removed from the debugger manager are outside this tool's scope. No separate log store is created.
+Standard text consoles and language-console output history are supported. Language-console **unsubmitted input is excluded**. For duplex consoles, the primary console is read regardless of which view is selected. Gradle build composites read their owned process console rather than build-tree output. A console without accessible text returns an explicit error. Only sessions resolvable by `list_debug_sessions` are supported; plain Run configurations, terminals, and sessions already removed from the debugger manager are outside this tool's scope. No separate log store is created.
 
 ---
 

@@ -5,7 +5,7 @@
 # change for every MCP client. 'optional' means the property has a Kotlin default;
 # production serializes with encodeDefaults=true, so optional fields are still
 # emitted. StreamableHttpTransportTest pins the bytes actually sent to a client.
-# shapes: 30
+# shapes: 33
 
 ## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.history.CommandEntryExport
 kind: CLASS
@@ -137,6 +137,28 @@ kind: CLASS
   status: STRING [required,non-null]
   message: STRING [required,non-null]
   sessionId: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConsoleOutputResult
+kind: CLASS
+  session: CLASS [required,non-null]
+  console: CLASS [nullable,optional]
+  consoleError: STRING [nullable,optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunSessionInfo
+kind: CLASS
+  id: STRING [required,non-null]
+  configurationName: STRING [required,non-null]
+  state: STRING [required,non-null]
+  exitCode: INT [nullable,optional]
+  failureMessage: STRING [nullable,optional]
+  consoleAvailable: BOOLEAN [optional]
+  mode: STRING [optional]
+
+## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunSessionListResult
+kind: CLASS
+  sessions: LIST [required,non-null]
+  trackingLimitReached: BOOLEAN [required,non-null]
+  maxSessions: INT [required,non-null]
 
 ## com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SelectFrameResult
 kind: CLASS

@@ -2,7 +2,7 @@
 name: jetbrains-debugger
 description: >-
   Guide for using JetBrains IDE Debugger MCP tools to programmatically debug applications.
-  TRIGGER when ANY of these MCP tools are available: list_run_configurations, execute_run_configuration,
+  TRIGGER when ANY of these MCP tools are available: list_run_configurations, execute_run_configuration, list_run_sessions, get_run_console_output, stop_run_session,
   start_debug_session, stop_debug_session, get_debug_session_status, get_console_output, list_debug_sessions, list_android_processes, attach_android_debugger,
   set_breakpoint, remove_breakpoint, list_breakpoints, resume_execution, pause_execution,
   step_over, step_into, step_out, run_to_line, jump_to_line, wait_for_pause, get_stack_trace, select_stack_frame,
@@ -44,6 +44,15 @@ symbol directories, use the IDE's **Attach Debugger to Android Process** action 
 reuse that configuration, then discover the session with `list_debug_sessions`.
 If automatic attachment is unavailable, attach through the IDE's **Attach Debugger to Android Process**
 action and discover the session with `list_debug_sessions`.
+
+### Ordinary Run Configurations
+
+Use `execute_run_configuration` with `mode: "run"`, then retain its `run:` sessionId.
+Inspect `list_run_sessions` and `get_run_console_output` for startup/exit diagnostics; `starting`
+is not successful startup. Read backward pages with `lines`, `offset`, and `max_chars`.
+Stop only that exact ID with `stop_run_session`; Debug tools reject Run IDs. Console history is
+IDE-owned, bounded by IDE retention, and unrecoverable after clear/eviction/tab reuse. Metadata
+is bounded to 128 records per project; see the tool reference for lifecycle limitations.
 
 ### Standard Debugging Sequence
 

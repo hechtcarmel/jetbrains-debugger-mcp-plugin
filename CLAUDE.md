@@ -26,6 +26,9 @@ IMPORTANT: When debugging, prefer using jetbrains-debugger MCP tools to interact
 |------|-------------|
 | `list_run_configurations` | List available run configurations |
 | `execute_run_configuration` | Run a configuration (debug or run mode) |
+| `list_run_sessions` | Discover ordinary Run lifecycle records |
+| `get_run_console_output` | Read retained text and startup/exit diagnostics for an exact Run ID |
+| `stop_run_session` | Stop only the requested Run process |
 | `list_debug_sessions` | List active debug sessions |
 | `list_android_processes` | List running Android processes by device serial, PID and exact name |
 | `attach_android_debugger` | Attach the Android debugger to a running Android app process |
@@ -259,7 +262,7 @@ in step with `platformVersion`.
 
 | Layer | Location | What it protects |
 |-------|----------|------------------|
-| **Golden contracts** | `contract/` | The client-facing surface: 27 tool schemas, 30 result-model wire shapes |
+| **Golden contracts** | `contract/` | The client-facing surface: 30 tool schemas, 33 result-model wire shapes |
 | **SDK assumptions** | `mcp/McpSdkAssumptionsTest` | What this plugin relies on the MCP SDK doing — fails on an SDK bump, not a refactor |
 | **Transport conformance** | `server/transport/` | Every route, status code, header, Origin decision and SSE frame, over real HTTP |
 | **Tool behaviour** | `tools/**/*BehaviorTest` | What a tool actually does to IDE state |
@@ -429,3 +432,5 @@ override suspend fun doExecute(...): ToolCallResult {
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.putJsonArray
 ```
+
+Ordinary RUN tools use a project service with at most 128 metadata entries and weak process/tab references. XML project listeners observe execution and explicit executor-bearing content events. `execute_run_configuration(mode=run)` reserves a `run:` ID before launch; it reports `starting` until the IDE reports a result and retains bounded failure diagnostics. No output is duplicated. Reused descriptors must still reference the exact original handler to be read. Pre-existing tabs are observed on selection; unknown executors are never guessed. The public UI snapshot supplies the owned process console in Gradle BuildView composites, avoiding its internal accessor. New service/HTTP and BuildView tests are present; final platform/runtime validation remains required.

@@ -135,6 +135,13 @@ for detailed documentation and examples.</p>
         <notificationGroup id="Debugger MCP Server" displayType="BALLOON"/>
     </extensions>
 
+    <projectListeners>
+        <listener class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.RunSessionExecutionListener"
+                  topic="com.intellij.execution.ExecutionListener"/>
+        <listener class="com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.RunSessionContentListener"
+                  topic="com.intellij.execution.ui.RunContentWithExecutorListener"/>
+    </projectListeners>
+
     <actions>
         <group id="DebuggerMcpServer.Actions" text="Debugger MCP Server" popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last"/>

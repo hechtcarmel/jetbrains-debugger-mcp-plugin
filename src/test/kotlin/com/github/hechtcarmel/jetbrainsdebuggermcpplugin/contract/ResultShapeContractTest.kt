@@ -16,6 +16,9 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RemoveBrea
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationInfo
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationListResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConfigurationResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunSessionInfo
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunSessionListResult
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunConsoleOutputResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SelectFrameResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetBreakpointResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.SetVariableResult
@@ -120,6 +123,9 @@ class ResultShapeContractTest {
             serializer<RunConfigurationInfo>().descriptor,
             serializer<RunConfigurationListResult>().descriptor,
             serializer<RunConfigurationResult>().descriptor,
+            serializer<RunSessionInfo>().descriptor,
+            serializer<RunSessionListResult>().descriptor,
+            serializer<RunConsoleOutputResult>().descriptor,
             serializer<ExecutionControlResult>().descriptor,
 
             // Command history — written to disk by the tool window's Export action, so a
