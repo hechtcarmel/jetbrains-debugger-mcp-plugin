@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-11-14
+
 ### Added
 
 - Ordinary Run session discovery, bounded retained console pages, startup/exit diagnostics and exact-session stopping via `list_run_sessions`, `get_run_console_output` and `stop_run_session` (#84). Run-mode execution returns a distinct `run:` ID and reports asynchronous startup honestly.
@@ -309,7 +311,8 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.4.0...HEAD
+[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.5.0...HEAD
+[5.5.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.4.0...5.5.0
 [5.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.3.0...5.4.0
 [5.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.2.0...5.3.0
 [5.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.1.0...5.2.0
@@ -317,25 +320,25 @@
 [5.0.2]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.0.1...5.0.2
 [5.0.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.0.0...5.0.1
 [5.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/4.4.0...5.0.0
-[4.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.3.1...v4.4.0
-[4.3.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.3.0...v4.3.1
-[4.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.2.0...v4.3.0
-[4.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.1.0...v4.2.0
-[4.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v4.0.0...v4.1.0
-[4.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v3.4.0...v4.0.0
-[3.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v3.3.1...v3.4.0
-[3.3.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v3.3.0...v3.3.1
-[3.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v3.2.0...v3.3.0
-[3.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v3.1.1...v3.2.0
-[3.1.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v3.1.0...v3.1.1
-[3.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v3.0.1...v3.1.0
-[3.0.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v3.0.0...v3.0.1
-[3.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v2.0.0...v3.0.0
-[2.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v1.3.1...v2.0.0
-[1.3.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v1.3.0...v1.3.1
-[1.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v1.2.2...v1.3.0
-[1.2.2]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v1.2.1...v1.2.2
-[1.2.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/commits/v1.0.0
+[4.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/4.3.1...4.4.0
+[4.3.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/4.3.0...4.3.1
+[4.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/4.2.0...4.3.0
+[4.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/4.1.0...4.2.0
+[4.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/4.0.0...4.1.0
+[4.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/3.4.0...4.0.0
+[3.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/3.3.1...3.4.0
+[3.3.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/3.3.0...3.3.1
+[3.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/3.2.0...3.3.0
+[3.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/3.1.1...3.2.0
+[3.1.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/3.1.0...3.1.1
+[3.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/3.0.1...3.1.0
+[3.0.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/3.0.0...3.0.1
+[3.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/2.0.0...3.0.0
+[2.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/1.3.1...2.0.0
+[1.3.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/1.3.0...1.3.1
+[1.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/1.2.2...1.3.0
+[1.2.2]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/1.2.1...1.2.2
+[1.2.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/1.2.0...1.2.1
+[1.2.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/1.1.0...1.2.0
+[1.1.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/1.0.0...1.1.0
+[1.0.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/commits/1.0.0
