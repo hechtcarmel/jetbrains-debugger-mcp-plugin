@@ -34,7 +34,7 @@ class StopSessionToolBehaviorTest : McpHttpTestCase() {
     ) : ProcessHandler() {
         var destroyed = 0
         var detached = 0
-        init { handlers.add(this); startNotify() }
+        init { handlers.add(this) }
         override fun destroyProcessImpl() {
             assertStopThread()
             destroyed++
@@ -72,6 +72,7 @@ class StopSessionToolBehaviorTest : McpHttpTestCase() {
     }
 
     private fun runSession(handler: Handler, name: String): String {
+        handler.startNotify() // XDebuggerManager owns this notification for Debug fixtures.
         val view = console()
         val descriptor = RunContentDescriptor(view, handler, view.component, name)
         Disposer.register(testRootDisposable, descriptor)
@@ -89,6 +90,7 @@ class StopSessionToolBehaviorTest : McpHttpTestCase() {
                 }
                 override fun createConsole(): ConsoleView = view
                 override fun doGetProcessHandler(): ProcessHandler = handler
+                override fun stop() {} // Fake debugger has no backend to stop after handler termination.
             }
         })
     }
