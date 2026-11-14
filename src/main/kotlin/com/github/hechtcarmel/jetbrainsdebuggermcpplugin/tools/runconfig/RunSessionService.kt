@@ -6,6 +6,7 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunSession
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.RunSessionListResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StopSessionResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ConsoleOutputReader
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ProcessTermination
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.ui.ConsoleView
@@ -13,12 +14,15 @@ import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.execution.ui.RunContentManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import java.lang.ref.WeakReference
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** EDT-owned bounded metadata; the IDE alone owns all console history and process lifetimes. */
 @Service(Service.Level.PROJECT)
@@ -230,18 +234,26 @@ class RunSessionService(private val project: Project) : Disposable {
         }
     }
 
-    fun stop(id: String): StopSessionResult {
-        assertEdt()
-        refresh()
-        val entry = requireEntry(id)
-        val handler = entry.handler?.get()
-        if (handler == null || handler.isProcessTerminated) {
-            return StopSessionResult(entry.id, "not_running", "This Run session has no running process; no process was stopped")
+    suspend fun stop(id: String): StopSessionResult {
+        // Resolve once on the EDT. Keep this exact handler across the dispatcher boundary;
+        // a later focus/tab/alias change must not select a different process to terminate.
+        val target = withContext(Dispatchers.EDT) {
+            assertEdt()
+            refresh()
+            val entry = requireEntry(id)
+            val handler = entry.handler?.get()?.takeIf { it.isStartNotified && !it.isProcessTerminated }
+            entry.id to handler
         }
-        // Never search by configuration name, PID, focused tab or execution-id batch.
-        if (!handler.isProcessTerminating) handler.destroyProcess()
-        entry.state = "stopping"
-        return StopSessionResult(entry.id, "stopping", "Stop requested for this exact Run session")
+        val handler = target.second ?: return StopSessionResult(target.first, "not_running",
+            "This Run session has no running process; no process was stopped")
+        ProcessTermination.request(handler)
+        return withContext(Dispatchers.EDT) {
+            assertEdt()
+            val entry = entryForId(target.first)?.takeIf { it.handler?.get() === handler }
+            refresh()
+            if (entry != null && !handler.isProcessTerminated && entry.state != "failed_start") entry.state = "stopping"
+            StopSessionResult(entry?.id ?: target.first, "stopping", "Stop requested for this exact Run session")
+        }
     }
 
     private fun reconcileObserved(target: Entry, handler: ProcessHandler) {

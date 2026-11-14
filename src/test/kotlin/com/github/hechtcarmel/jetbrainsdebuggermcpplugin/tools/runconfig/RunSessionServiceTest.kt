@@ -1,6 +1,10 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolExecutionError
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StopSessionResult
+import com.intellij.openapi.application.ApplicationManager
+import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CompletableFuture
 import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.configurations.RunProfileState
 import com.intellij.execution.configurations.RunnerSettings
@@ -41,11 +45,31 @@ class RunSessionServiceTest : BasePlatformTestCase() {
     private inner class Handler : ProcessHandler() {
         init { handlers.add(this) }
         var stopCount = 0
-        override fun destroyProcessImpl() { stopCount++; notifyProcessTerminated(143) }
+        override fun destroyProcessImpl() {
+            check(!ApplicationManager.getApplication().isDispatchThread) { "Termination must not run on the EDT" }
+            check(!ApplicationManager.getApplication().isReadAccessAllowed) { "Termination must not hold a read action" }
+            stopCount++
+            notifyProcessTerminated(143)
+        }
         override fun detachProcessImpl() { notifyProcessDetached() }
         override fun detachIsDefault() = false
         override fun getProcessInput(): OutputStream? = null
         fun finish(code: Int) = notifyProcessTerminated(code)
+    }
+
+    /** The service crosses back to the EDT for metadata; keep pumping while it stops in IO. */
+    private fun stop(id: String): StopSessionResult {
+        val future = CompletableFuture.supplyAsync { runBlocking { service.stop(id) } }
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+        while (!future.isDone && System.nanoTime() < deadline) {
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
+            Thread.sleep(5)
+        }
+        if (!future.isDone) {
+            future.cancel(true)
+            fail("Stop timed out while pumping the EDT")
+        }
+        return try { future.get() } catch (e: java.util.concurrent.ExecutionException) { throw (e.cause ?: e) }
     }
 
     private fun environment(name: String): ExecutionEnvironment {
@@ -107,7 +131,7 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         assertEquals(7, service.session(id).exitCode)
         assertEquals("three\n", service.read(id, 1, 0, 100).console!!.output)
         assertEquals(0, otherHandler.stopCount)
-        assertEquals("not_running", service.stop(id).status)
+        assertEquals("not_running", stop(id).status)
         val console = descriptor.executionConsole as ConsoleView
         console.clear()
         // Clearing ConsoleView is asynchronous, just like rendering new output.
@@ -122,11 +146,23 @@ class RunSessionServiceTest : BasePlatformTestCase() {
     fun `test stop affects only selected process and Debug ids are rejected`() {
         val (id, first) = start("same name", "first\n")
         val (_, second) = start("same name", "second\n")
-        assertEquals("stopping", service.stop(id).status)
+        assertEquals("stopping", stop(id).status)
         assertEquals(1, first.stopCount)
         assertEquals(0, second.stopCount)
-        try { service.stop("debug-uuid"); fail("Expected Run id rejection") }
+        try { stop("debug-uuid"); fail("Expected Run id rejection") }
         catch (e: ToolExecutionError) { assertTrue(e.message!!.contains("Run session ID")) }
+    }
+
+    fun `test stop during pending startup does not queue later EDT destruction`() {
+        val env = environment("pending stop")
+        val id = service.scheduled(env)!!
+        val handler = Handler()
+        service.starting(env, handler)
+        assertEquals("not_running", stop(id).status)
+        handler.startNotify()
+        assertEquals(0, handler.stopCount)
+        assertEquals("stopping", stop(id).status)
+        assertEquals(1, handler.stopCount)
     }
 
     fun `test reused tab cannot supply newer output to an old id`() {
@@ -147,7 +183,7 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         assertEquals(RunSessionService.MAX_DIAGNOSTIC_CHARS, result.session.failureMessage!!.length)
         assertNull(result.console)
         assertNotNull(result.consoleError)
-        assertEquals("not_running", service.stop(id).status)
+        assertEquals("not_running", stop(id).status)
     }
 
     fun `test metadata cap evicts oldest finished record but preserves active records`() {
@@ -199,7 +235,7 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         service.started(env, second)
         val sessions = service.list().sessions
         assertEquals(2, sessions.size)
-        service.stop(sessions[1].id)
+        stop(sessions[1].id)
         assertEquals(0, first.stopCount)
         assertEquals(1, second.stopCount)
     }
@@ -271,7 +307,7 @@ class RunSessionServiceTest : BasePlatformTestCase() {
         env.putUserData(RunSessionService.SESSION_KEY, provisional)
         assertEquals(reserved, service.scheduled(env))
         service.bindDescriptor(provisional, descriptor)
-        val stopped = service.stop(provisional)
+        val stopped = stop(provisional)
         assertEquals(reserved, stopped.sessionId)
         assertEquals("stopping", stopped.status)
         assertEquals(1, handler.stopCount)

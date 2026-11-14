@@ -434,3 +434,12 @@ import kotlinx.serialization.json.putJsonArray
 ```
 
 Ordinary RUN tools use a project service with at most 128 metadata entries and weak process/tab references. XML project listeners observe execution and explicit executor-bearing content events. `execute_run_configuration(mode=run)` reserves a `run:` ID before launch; it reports `starting` until the IDE reports a result and retains bounded failure diagnostics. No output is duplicated. Reused descriptors must still reference the exact original handler to be read. Pre-existing tabs are observed on selection; unknown executors are never guessed. The public UI snapshot supplies the owned process console in Gradle BuildView composites, avoiding its internal accessor. New service/HTTP and BuildView tests are present; final platform/runtime validation remains required.
+
+Stop tools resolve IDs, session metadata and the debug detach policy on the EDT, then request only
+the captured `ProcessHandler`'s destruction/detachment in `Dispatchers.IO` without a read action.
+Gradle cancellation can synchronously resolve its JVM and must not run on the EDT. Run metadata
+bookkeeping returns to the EDT and checks the same handler, including alias reconciliation.
+Cancellation remains cancellation; operation errors remain tool errors. No detached fire-and-forget
+job reports success before the request returns. Pre-start handlers are not given queued stop
+requests: `ProcessHandler` would otherwise execute them on the later `startNotify()` caller,
+potentially the EDT. RUN reports `not_running`; DEBUG returns an explicit retry error.

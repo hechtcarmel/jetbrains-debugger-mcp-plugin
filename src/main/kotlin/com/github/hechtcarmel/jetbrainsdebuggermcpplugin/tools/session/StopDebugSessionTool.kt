@@ -2,8 +2,10 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolExecutionError
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.StopSessionResult
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ProcessTermination
 import com.intellij.openapi.project.Project
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.coroutines.CancellationException
@@ -42,22 +44,33 @@ class StopDebugSessionTool : AbstractMcpTool() {
     override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
         val sessionId = ToolArguments.optionalString(arguments, "session_id")
 
-        val session = requireSession(project, sessionId)
-
-        val resolvedSessionId = getSessionId(session)
-        val sessionName = session.sessionName
-
         return try {
-            onEdt { session.stop() }
+            val target = onEdt {
+                val session = requireSession(project, sessionId)
+                val handler = session.debugProcess.processHandler
+                DebugStopTarget(getSessionId(session), session.sessionName, handler, handler.detachIsDefault())
+            }
+            // XDebugSessionImpl.stop uses this handler's detach policy. Capture on the
+            // EDT, but do not perform Gradle/external-system cancellation while on it.
+            ProcessTermination.request(target.handler, target.detach)
             createJsonResult(StopSessionResult(
-                sessionId = resolvedSessionId,
+                sessionId = target.id,
                 status = "stopped",
-                message = "Debug session '$sessionName' stopped"
+                message = "Debug session '${target.name}' stopped"
             ))
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: ToolExecutionError) {
             throw e
         } catch (e: Exception) {
             createErrorResult("Failed to stop session: ${e.message}")
         }
     }
+
+    private data class DebugStopTarget(
+        val id: String,
+        val name: String,
+        val handler: com.intellij.execution.process.ProcessHandler,
+        val detach: Boolean
+    )
 }

@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Avoid IDE internal errors when stopping Gradle-delegated Run and Debug sessions; preserve exact process selection and the debugger's detach policy.
 - Select the owned process console in Gradle BuildView composites when reading debug/logpoint output, without using the internal BuildView accessor or switching the visible view (#93).
 
 ## [5.4.0] - 2026-11-05

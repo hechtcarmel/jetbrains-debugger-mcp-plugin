@@ -2,9 +2,11 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.AbstractMcpTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolAnnotationPresets
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.ToolExecutionError
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util.ToolArguments
 import com.intellij.openapi.project.Project
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 
 class ListRunSessionsTool : AbstractMcpTool() {
@@ -57,6 +59,14 @@ class StopRunSessionTool : AbstractMcpTool() {
     }
     override suspend fun doExecute(project: Project, arguments: JsonObject): CallToolResult {
         val id = ToolArguments.requireString(arguments, "session_id")
-        return createJsonResult(onEdt { RunSessionService.getInstance(project).stop(id) })
+        return try {
+            createJsonResult(RunSessionService.getInstance(project).stop(id))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: ToolExecutionError) {
+            throw e
+        } catch (e: Exception) {
+            createErrorResult("Failed to stop Run session: ${e.message}")
+        }
     }
 }
