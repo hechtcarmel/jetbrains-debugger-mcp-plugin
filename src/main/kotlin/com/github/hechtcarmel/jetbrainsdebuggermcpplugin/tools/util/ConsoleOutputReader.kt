@@ -6,6 +6,10 @@ import com.intellij.execution.console.ConsoleViewWrapperBase
 import com.intellij.execution.console.DuplexConsoleView
 import com.intellij.execution.console.LanguageConsoleView
 import com.intellij.execution.ui.ConsoleView
+import com.intellij.openapi.actionSystem.CustomizedDataContext
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.LangDataKeys
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.EditorKind
@@ -47,7 +51,25 @@ internal object ConsoleOutputReader {
             view = when (view) {
                 is ConsoleViewWrapperBase -> view.delegate
                 is DuplexConsoleView<*, *> -> view.primaryConsoleView
-                else -> return view
+                else -> {
+                    // BuildView publishes its process console through the public UI snapshot.
+                    // Its getConsoleView() is @Internal; searching the composite's editors also
+                    // includes the build tree's editor. Use only this view's own provider and
+                    // verify component ownership, never an ancestor/focus/global data context.
+                    val component = view.component
+                    val provider = (view as? UiDataProvider) ?: (component as? UiDataProvider)
+                    val nested = provider?.let {
+                        val context = CustomizedDataContext.withSnapshot(DataContext.EMPTY_CONTEXT) { sink ->
+                            sink.uiDataSnapshot(it)
+                        }
+                        LangDataKeys.CONSOLE_VIEW.getData(context)
+                    }
+                    if (nested == null || nested === view) return view
+                    if (!SwingUtilities.isDescendingFrom(nested.component, component)) {
+                        throw ToolExecutionError("Console output is not available: console provider returned a foreign view")
+                    }
+                    nested
+                }
             }
         }
         throw ToolExecutionError("Console output is not available: cyclic console wrapper")

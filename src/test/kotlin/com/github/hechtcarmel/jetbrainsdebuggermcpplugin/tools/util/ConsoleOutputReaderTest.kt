@@ -7,6 +7,10 @@ import com.intellij.execution.console.LanguageConsoleImpl
 import com.intellij.execution.filters.TextConsoleBuilderFactory
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.execution.ui.ConsoleViewContentType
+import com.intellij.build.BuildView
+import com.intellij.build.DefaultBuildDescriptor
+import com.intellij.build.ViewManager
+import com.intellij.openapi.actionSystem.LangDataKeys
 import com.intellij.openapi.fileTypes.PlainTextLanguage
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataSink
@@ -161,6 +165,43 @@ class ConsoleOutputReaderTest : BasePlatformTestCase() {
 
     fun `test unsupported console returns a useful error instead of empty success`() {
         assertUnsupported(javax.swing.JPanel())
+    }
+
+    fun `test Gradle build composite reads process console instead of selected tree console`() {
+        val process = console()
+        val tree = console()
+        process.print("logpoint from Gradle application\n", ConsoleViewContentType.SYSTEM_OUTPUT)
+        tree.print("selected build tree details\n", ConsoleViewContentType.NORMAL_OUTPUT)
+        render(process)
+        render(tree)
+        val manager = object : ViewManager {
+            override fun isConsoleEnabledByDefault() = false
+            override fun isBuildContentView() = false
+        }
+        val build = BuildView(project, process, DefaultBuildDescriptor("test", "Gradle", project.basePath!!, 0), null, manager)
+        Disposer.register(testRootDisposable, build)
+        build.addView(process, "consoleView")
+        build.addView(tree, "buildTree")
+        build.showView("buildTree", false)
+        assertEquals("logpoint from Gradle application\n", ConsoleOutputReader.read(build, "debug", 100, 0, 20000).output)
+        assertTrue("Reading must not switch the selected build view", build.isViewVisible("buildTree"))
+    }
+
+    fun `test a provider cannot redirect reading to a foreign console`() {
+        val foreign = console()
+        val component = object : javax.swing.JPanel(), UiDataProvider {
+            override fun uiDataSnapshot(sink: DataSink) { sink[LangDataKeys.CONSOLE_VIEW] = foreign }
+        }
+        val view = java.lang.reflect.Proxy.newProxyInstance(ConsoleView::class.java.classLoader,
+            arrayOf(ConsoleView::class.java)) { _, method, _ ->
+            if (method.name == "getComponent") component else throw UnsupportedOperationException(method.name)
+        } as ConsoleView
+        try {
+            ConsoleOutputReader.read(view, "session", 100, 0, 20000)
+            fail("Foreign console must be rejected")
+        } catch (e: ToolExecutionError) {
+            assertTrue(e.message!!.contains("foreign view"))
+        }
     }
 
     fun `test a foreign console editor in the data context is never read`() {

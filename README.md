@@ -27,7 +27,8 @@ A JetBrains IDE plugin that exposes an **MCP (Model Context Protocol) server**, 
 - **Line Breakpoints** - Set breakpoints at any valid location
 - **Conditional Breakpoints** - Add conditions that must be true to pause
 - **Tracepoints** - Log messages without pausing execution
-- **Console Output** - Read logpoint results and retained debug-console text with bounded pagination
+- **Run Lifecycle** - Discover ordinary Run sessions, retain startup/exit diagnostics, and stop the exact requested process
+- **Console Output** - Read logpoint results and retained Run/Debug console text with bounded pagination and exact session selection
 
 **Execution Control**
 - **Step Over/Into/Out** - Navigate through code line by line
@@ -60,7 +61,7 @@ Unlike manual debugging, this plugin enables:
 - **Rich Context in Single Calls** - Get variables, stack, and source in one request
 - **Programmatic Breakpoint Control** - Set conditional breakpoints with complex expressions
 - **Cross-IDE Compatibility** - Works with any JetBrains IDE that supports XDebugger
-- **27 Comprehensive Tools** - Full debugging capability through MCP
+- **30 Comprehensive Tools** - Full debugging capability through MCP
 - **Configurable Server** - IDE-specific ports with customizable host binding
 
 Perfect for AI-assisted development workflows where you want your assistant to investigate bugs, validate fixes, or explore code behavior autonomously.
@@ -231,7 +232,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ## Available Tools
 
-The plugin provides **27 MCP tools** organized by category:
+The plugin provides **30 MCP tools** organized by category:
 
 ### Run Configuration Tools
 
@@ -239,6 +240,9 @@ The plugin provides **27 MCP tools** organized by category:
 |------|-------------|
 | `list_run_configurations` | List all available run configurations in the project |
 | `execute_run_configuration` | Execute a run configuration in debug or run mode |
+| `list_run_sessions` | List tracked ordinary Run sessions and their lifecycle status |
+| `stop_run_session` | Stop only the process owned by the selected Run session |
+| `get_run_console_output` | Read a bounded page from the selected Run session’s retained console |
 
 ### Debug Session Tools
 

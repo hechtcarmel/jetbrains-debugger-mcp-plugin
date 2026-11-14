@@ -40,7 +40,7 @@ class AndroidOptionalLoadingTest {
             val type = loader.loadClass(registryClass.name)
             val registry = type.getConstructor().newInstance()
             type.getMethod("registerBuiltInTools").invoke(registry)
-            assertEquals(27, type.getMethod("getToolCount").invoke(registry))
+            assertEquals(30, type.getMethod("getToolCount").invoke(registry))
         }
     }
 }

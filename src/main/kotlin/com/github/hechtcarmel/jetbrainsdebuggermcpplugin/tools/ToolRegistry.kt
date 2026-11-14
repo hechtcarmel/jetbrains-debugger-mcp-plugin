@@ -15,6 +15,9 @@ import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution.WaitFor
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.navigation.GetSourceContextTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.ListRunConfigurationsTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.RunConfigurationTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.ListRunSessionsTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.GetRunConsoleOutputTool
+import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.runconfig.StopRunSessionTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.GetDebugSessionStatusTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.GetConsoleOutputTool
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.session.ListDebugSessionsTool
@@ -50,6 +53,9 @@ class ToolRegistry {
         // Run Configuration Tools
         register(ListRunConfigurationsTool())
         register(RunConfigurationTool())
+        register(ListRunSessionsTool())
+        register(GetRunConsoleOutputTool())
+        register(StopRunSessionTool())
 
         // Debug Session Tools
         register(ListDebugSessionsTool())

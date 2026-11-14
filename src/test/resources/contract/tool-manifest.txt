@@ -1,7 +1,7 @@
 # MCP tool manifest — golden snapshot
 # Snapshot of the SDK Tool as serialized to clients, not of the authored schema.
 # Regenerate: ./gradlew test --tests "*ToolManifestContractTest" -Dcontract.update=true
-# tools: 27
+# tools: 30
 
 ## attach_android_debugger
 description:
@@ -98,6 +98,7 @@ outputSchema:
 description:
   Executes a run configuration in either 'run' or 'debug' mode.
   Use when you need to run or debug a specific configuration. For debugging with full session tracking, prefer start_debug_session instead.
+  Run mode returns a run: sessionId before asynchronous startup completes. status=starting is not confirmation of success; inspect list_run_sessions/get_run_console_output for failed_start, exit code and retained output. Use stop_run_session for that exact Run ID. Debug tools do not accept Run IDs.
 annotations:
   {
     "destructiveHint": false,
@@ -486,6 +487,57 @@ outputSchema:
     ],
     "type": "object"
   }
+
+## get_run_console_output
+description:
+  Reads only the exact ordinary Run session_id returned by execute_run_configuration(mode=run) or list_run_sessions. Returns session lifecycle/exit/failure diagnostics plus a bounded console page, or consoleError when no retained readable text is available. Failed or terminated sessions do not imply successful startup. Never launches, stops, pauses, flushes or changes console focus. lines defaults to 100 (max 1000), offset skips newest retained lines, max_chars defaults to 20000 (max 100000 UTF-16 characters). Pages keep their end when truncated. Line positions are relative to current IDE history, not durable cursors; cleared/evicted output is unrecoverable.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "Get Run Console Output"
+  }
+inputSchema:
+  {
+    "properties": {
+      "lines": {
+        "default": 100,
+        "description": "Maximum retained lines returned.",
+        "maximum": 1000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "max_chars": {
+        "default": 20000,
+        "description": "Maximum UTF-16 characters; retain the page end when truncated.",
+        "maximum": 100000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "offset": {
+        "default": 0,
+        "description": "Newest retained lines to skip for backward pagination.",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Required exact run: session ID; Debug IDs are rejected.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session_id"
+    ],
+    "type": "object"
+  }
+outputSchema:
+  <none>
 
 ## get_source_context
 description:
@@ -876,6 +928,31 @@ annotations:
     "openWorldHint": false,
     "readOnlyHint": true,
     "title": "List Run Configurations"
+  }
+inputSchema:
+  {
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      }
+    },
+    "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## list_run_sessions
+description:
+  Lists ordinary Run executions observed by this plugin, including starting, running, stopping, failed_start, terminated and unavailable records. IDs start with run: and cannot be used with Debug tools. Metadata is limited to 128 sessions per project; oldest finished records are evicted first. Console history remains owned by the IDE; closing/reusing tabs or clearing/cyclic history can remove it. Read and stop operations never fall back to another session.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true,
+    "title": "List Run Sessions"
   }
 inputSchema:
   {
@@ -1348,6 +1425,37 @@ inputSchema:
       }
     },
     "required": [],
+    "type": "object"
+  }
+outputSchema:
+  <none>
+
+## stop_run_session
+description:
+  Requests termination of only the exact ordinary Run session_id. Requires a run: ID; rejects Debug IDs. Does not search by name, PID or focused tab. Sessions without a live handler return not_running. A stopping response is a request, not confirmation of process exit; inspect list_run_sessions for completion.
+annotations:
+  {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false,
+    "title": "Stop Run Session"
+  }
+inputSchema:
+  {
+    "properties": {
+      "project_path": {
+        "description": "Absolute path to the project root. Required when multiple projects are open, optional otherwise.",
+        "type": "string"
+      },
+      "session_id": {
+        "description": "Required exact run: session ID.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session_id"
+    ],
     "type": "object"
   }
 outputSchema:
