@@ -2,6 +2,7 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util
 
 import com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.models.*
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
@@ -14,6 +15,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointType
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import com.intellij.xdebugger.frame.XStackFrame
+import kotlinx.coroutines.CancellationException
 
 object SessionStatusCollector {
 
@@ -69,16 +71,16 @@ object SessionStatusCollector {
         )
     }
 
-    fun determinePauseReason(session: XDebugSession): String {
-        val position = session.topFramePosition ?: return "step"
-        return if (findEnabledBreakpointAt(session, position) != null) "breakpoint" else "step"
+    fun determinePauseReason(session: XDebugSession): String = ReadAction.compute<String, Throwable> {
+        val position = session.topFramePosition ?: return@compute "step"
+        if (findEnabledBreakpointAt(session, position) != null) "breakpoint" else "step"
     }
 
-    fun getBreakpointHitInfo(session: XDebugSession): BreakpointHitInfo? {
-        val position = session.topFramePosition ?: return null
-        val breakpoint = findEnabledBreakpointAt(session, position) ?: return null
+    fun getBreakpointHitInfo(session: XDebugSession): BreakpointHitInfo? = ReadAction.compute<BreakpointHitInfo?, Throwable> {
+        val position = session.topFramePosition ?: return@compute null
+        val breakpoint = findEnabledBreakpointAt(session, position) ?: return@compute null
 
-        return BreakpointHitInfo(
+        BreakpointHitInfo(
             breakpointId = StableObjectIds.idFor(breakpoint),
             type = "line",
             file = position.file.path,
@@ -117,9 +119,12 @@ object SessionStatusCollector {
         return FrameVariablesCollector.collectVariables(frame)
     }
 
-    private fun getSourceLocation(frame: XStackFrame): SourceLocation? {
-        val position = frame.sourcePosition ?: return null
-        return SourceLocation(
+    // A debugger source position can lazily remap through PSI/documents even when reading its
+    // line. Acquire read access before obtaining the position, not just before reading source text.
+    // Keep asynchronous stack/variable collection outside these short, non-suspending snapshots.
+    private suspend fun getSourceLocation(frame: XStackFrame): SourceLocation? = readAction {
+        val position = frame.sourcePosition ?: return@readAction null
+        SourceLocation(
             file = position.file.path,
             line = position.line + 1,
             className = StackFrameUtils.extractClassName(frame),
@@ -128,8 +133,11 @@ object SessionStatusCollector {
         )
     }
 
-    private fun buildStackSummary(frames: List<XStackFrame>, currentFrame: XStackFrame?): List<StackFrameInfo> {
-        return frames.mapIndexed { index, frame ->
+    private suspend fun buildStackSummary(
+        frames: List<XStackFrame>,
+        currentFrame: XStackFrame?
+    ): List<StackFrameInfo> = readAction {
+        frames.mapIndexed { index, frame ->
             val position = frame.sourcePosition
             val path = position?.file?.path
             StackFrameInfo(
@@ -145,42 +153,39 @@ object SessionStatusCollector {
         }
     }
 
-    private fun getSourceContext(
+    private suspend fun getSourceContext(
         project: Project,
         frame: XStackFrame?,
         contextLines: Int
-    ): SourceContext? {
-        val position = frame?.sourcePosition ?: return null
+    ): SourceContext? = readAction {
+        val position = frame?.sourcePosition ?: return@readAction null
         val file = position.file
         val currentLine = position.line + 1
 
-        val (startLine, endLine, lines) = ReadAction.compute<Triple<Int, Int, List<SourceLine>>?, Throwable> {
-            val document = FileDocumentManager.getInstance().getDocument(file)
-                ?: return@compute null
+        val document = FileDocumentManager.getInstance().getDocument(file) ?: return@readAction null
+        val startLine = maxOf(1, currentLine - contextLines)
+        val endLine = minOf(document.lineCount, currentLine + contextLines)
 
-            val start = maxOf(1, currentLine - contextLines)
-            val end = minOf(document.lineCount, currentLine + contextLines)
-
-            val sourceLines = (start..end).mapNotNull { lineNum ->
-                try {
-                    val lineIndex = lineNum - 1
-                    if (lineIndex >= 0 && lineIndex < document.lineCount) {
-                        val lineStart = document.getLineStartOffset(lineIndex)
-                        val lineEnd = document.getLineEndOffset(lineIndex)
-                        val content = document.getText(TextRange(lineStart, lineEnd))
-                        SourceLine(
-                            number = lineNum,
-                            content = content,
-                            isCurrent = lineNum == currentLine
-                        )
-                    } else null
-                } catch (e: Exception) {
-                    null
-                }
+        val lines = (startLine..endLine).mapNotNull { lineNum ->
+            try {
+                val lineIndex = lineNum - 1
+                if (lineIndex >= 0 && lineIndex < document.lineCount) {
+                    val lineStart = document.getLineStartOffset(lineIndex)
+                    val lineEnd = document.getLineEndOffset(lineIndex)
+                    val content = document.getText(TextRange(lineStart, lineEnd))
+                    SourceLine(
+                        number = lineNum,
+                        content = content,
+                        isCurrent = lineNum == currentLine
+                    )
+                } else null
+            } catch (e: CancellationException) {
+                // Coroutine read actions must be able to cancel/retry when a writer arrives.
+                throw e
+            } catch (e: Exception) {
+                null
             }
-
-            Triple(start, end, sourceLines)
-        } ?: return null
+        }
 
         val breakpointManager = XDebuggerManager.getInstance(project).breakpointManager
         val breakpointsInView = breakpointManager.allBreakpoints
@@ -191,7 +196,7 @@ object SessionStatusCollector {
             }
             .map { it.line + 1 }
 
-        return SourceContext(
+        SourceContext(
             file = file.path,
             startLine = startLine,
             endLine = endLine,

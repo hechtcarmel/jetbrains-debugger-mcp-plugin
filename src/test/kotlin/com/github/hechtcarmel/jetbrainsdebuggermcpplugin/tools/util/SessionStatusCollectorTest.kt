@@ -1,7 +1,9 @@
 package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.util
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerUtil
@@ -11,15 +13,21 @@ import com.intellij.xdebugger.breakpoints.XBreakpointType
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import com.intellij.xdebugger.evaluation.EvaluationMode
+import com.intellij.xdebugger.frame.XCompositeNode
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
+import com.intellij.xdebugger.frame.XValueChildrenList
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
 /**
  * Unit-level coverage for SessionStatusCollector against a real XBreakpointManager and a
- * hand-rolled session/suspend-context. No live debuggee exists in the suite, so the pause-site
- * semantics (top frame vs selected frame, muted/disabled filtering) and the stack/thread
- * collection are pinned here with fakes instead.
+ * hand-rolled session/suspend-context. These tests pin pause-site semantics, stack/thread
+ * collection and background-thread read access independently of the live debuggee suite.
  */
 class SessionStatusCollectorTest : BasePlatformTestCase() {
 
@@ -252,6 +260,141 @@ class SessionStatusCollectorTest : BasePlatformTestCase() {
         assertEquals("paused", status.currentThread!!.state)
         assertTrue(status.currentThread!!.isCurrent)
         assertEquals(3, status.threadCount)
+    }
+
+    // Mapped JVM positions can touch PSI/documents from getSourcePosition/getLine. Plain fake
+    // positions and EDT-only fixture tests mask missing read actions (issue #97).
+    private fun readCheckedPosition(line: Int): XSourcePosition {
+        val delegate = position(line)
+        return object : XSourcePosition by delegate {
+            override fun getFile(): VirtualFile {
+                check(ApplicationManager.getApplication().isReadAccessAllowed)
+                return delegate.file
+            }
+
+            override fun getLine(): Int {
+                check(ApplicationManager.getApplication().isReadAccessAllowed)
+                return delegate.line
+            }
+        }
+    }
+
+    private fun readCheckedFrame(position: XSourcePosition): XStackFrame = object : XStackFrame() {
+        override fun getSourcePosition(): XSourcePosition {
+            check(ApplicationManager.getApplication().isReadAccessAllowed)
+            return position
+        }
+
+        override fun computeChildren(node: XCompositeNode) {
+            check(!ApplicationManager.getApplication().isReadAccessAllowed) {
+                "Asynchronous variable collection must not hold a read lock"
+            }
+            node.addChildren(XValueChildrenList.EMPTY, true)
+        }
+    }
+
+    private fun <T> inBackground(block: suspend () -> T): T {
+        // Pump the fixture's EDT while a coroutine read action yields to pending IDE writes.
+        val future = CompletableFuture.supplyAsync {
+            runBlocking(Dispatchers.Default) {
+                check(!ApplicationManager.getApplication().isDispatchThread)
+                check(!ApplicationManager.getApplication().isReadAccessAllowed)
+                withTimeout(10_000) { block() }
+            }
+        }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
+        while (!future.isDone && System.nanoTime() < deadline) {
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
+            Thread.sleep(5)
+        }
+        return try {
+            future.get(1, TimeUnit.SECONDS)
+        } catch (e: java.util.concurrent.ExecutionException) {
+            throw e.cause ?: e
+        } finally {
+            future.cancel(true)
+        }
+    }
+
+    fun `test background stack summary reads mapped positions under read access`() {
+        val frame = readCheckedFrame(readCheckedPosition(4))
+        val session = FakeDebugSession().apply {
+            fakeProject = this@SessionStatusCollectorTest.project
+            // No selected frame or top position: exercise buildStackSummary independently.
+            fakeSuspendContext = suspendContextOf(stackOf("worker", listOf(frame)))
+        }
+
+        val status = inBackground {
+            SessionStatusCollector.collectStatus(project, session, includeVariables = false, includeSourceContext = false)
+        }
+
+        assertEquals(5, status.stackSummary.single().line)
+        assertEquals(file.path, status.stackSummary.single().file)
+        assertEquals("${file.name}:5", status.stackSummary.single().presentation)
+    }
+
+    fun `test background status snapshots source and breakpoints without locking callbacks`() {
+        addBreakpoint(4)
+        val position = readCheckedPosition(4)
+        val frame = readCheckedFrame(position)
+        val stack = object : XExecutionStack("worker") {
+            override fun getTopFrame(): XStackFrame = frame
+            override fun computeStackFrames(firstFrameIndex: Int, container: XStackFrameContainer) {
+                check(!ApplicationManager.getApplication().isReadAccessAllowed) {
+                    "Asynchronous frame collection must not hold a read lock"
+                }
+                container.addStackFrames(emptyList(), true)
+            }
+        }
+        val session = pausedSession(4).apply {
+            fakeTopFramePosition = position
+            fakeCurrentStackFrame = frame
+            fakeSuspendContext = suspendContextOf(stack)
+        }
+
+        val status = inBackground { SessionStatusCollector.collectStatus(project, session, sourceContextLines = 1) }
+
+        assertEquals("breakpoint", status.pausedReason)
+        assertEquals(5, status.breakpointHit!!.line)
+        assertEquals(5, status.currentLocation!!.line)
+        val source = requireNotNull(status.sourceContext)
+        assertEquals(file.path, source.file)
+        assertEquals(5, source.currentLine)
+        assertEquals(listOf(4, 5, 6), source.lines.map { it.number })
+        assertTrue(source.lines.single { it.isCurrent }.content.contains("total += i"))
+        assertEquals(listOf(5), source.breakpointsInView)
+        assertTrue(status.variables.isEmpty())
+    }
+
+    fun `test background pause helpers independently protect mapped positions`() {
+        addBreakpoint(4)
+        val session = pausedSession(4).apply { fakeTopFramePosition = readCheckedPosition(4) }
+
+        val (reason, hit) = inBackground {
+            SessionStatusCollector.determinePauseReason(session) to SessionStatusCollector.getBreakpointHitInfo(session)
+        }
+
+        assertEquals("breakpoint", reason)
+        assertEquals(5, hit!!.line)
+        assertEquals(file.path, hit.file)
+    }
+
+    fun `test background source mapping cancellation propagates`() {
+        val delegate = position(4)
+        val position = object : XSourcePosition by delegate {
+            override fun getLine(): Int = throw CancellationException("mapping cancelled")
+        }
+        val session = pausedSession(4).apply {
+            fakeTopFramePosition = null
+            fakeCurrentStackFrame = readCheckedFrame(position)
+        }
+
+        try {
+            inBackground { SessionStatusCollector.collectStatus(project, session, includeVariables = false) }
+            fail("Cancellation must not turn into a partial successful status")
+        } catch (e: CancellationException) {
+            assertEquals("mapping cancelled", e.message)
+        }
     }
 
     // ── Running-session gating (C13) ────────────────────────────────────────────────────

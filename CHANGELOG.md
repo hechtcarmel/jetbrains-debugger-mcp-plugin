@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Read lazily mapped debugger source positions under read access when collecting session status, including stack summaries, pause-site breakpoints and source context (#97).
+
 ## [5.5.0] - 2026-11-14
 
 ### Added
