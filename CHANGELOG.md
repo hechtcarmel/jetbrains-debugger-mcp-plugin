@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [5.5.1] - 2026-11-16
+
 ### Fixed
 
 - Read lazily mapped debugger source positions under read access when collecting session status, including stack summaries, pause-site breakpoints and source context (#97).
@@ -315,7 +317,8 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.5.0...HEAD
+[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.5.1...HEAD
+[5.5.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.5.0...5.5.1
 [5.5.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.4.0...5.5.0
 [5.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.3.0...5.4.0
 [5.3.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.2.0...5.3.0
