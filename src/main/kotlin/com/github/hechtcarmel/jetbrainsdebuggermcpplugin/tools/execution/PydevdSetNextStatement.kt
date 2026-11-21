@@ -8,6 +8,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Reflective bridge to PyCharm's pydevd "Jump to Cursor":
@@ -19,7 +20,7 @@ import java.lang.reflect.Proxy
  * action and its debugger test harness call. It is reached reflectively, matched by name and
  * parameter shape on whatever the session's debug process is, so this plugin needs no compile-time
  * dependency on the Python plugin and keeps loading in IDEs without it. Debug processes that do not
- * have the method (the JVM debugger, the debugpy/DAP backend, native debuggers) get no bridge, and
+ * have the method (for example, the JVM debugger and native debuggers) get no bridge, and
  * [find] returns null for them.
  *
  * What pydevd does with the request (`python/helpers/pydev/pydevd.py`, `set_next_statement`): it
@@ -43,7 +44,7 @@ internal class PydevdSetNextStatement private constructor(
         /** The request could not be made, or the reply could not be read. */
         data class Failed(val reason: String) : Reply
 
-        /** No answer within the timeout. */
+        /** Neither a reply nor an independently confirmed target move within the timeout. */
         data object NoReply : Reply
     }
 
@@ -53,9 +54,18 @@ internal class PydevdSetNextStatement private constructor(
      * `startSetNextStatement` blocks on the debugger socket until pydevd answers (its own limit is
      * 60 s) and resolves the target's enclosing function under a read action, so it runs on a pooled
      * thread — never on the EDT, and never on this coroutine, which gives up after [timeoutMs].
+     * A backend can move without completing this callback. The caller can
+     * confirm the exact changed target on the captured session/thread instead; a sent request or
+     * an unchanged pause is never treated as acceptance.
      */
-    suspend fun request(context: XSuspendContext?, target: XSourcePosition, timeoutMs: Long): Reply {
+    suspend fun request(
+        context: XSuspendContext?,
+        target: XSourcePosition,
+        timeoutMs: Long,
+        confirmsTarget: suspend () -> Boolean = { false },
+    ): Reply {
         val reply = CompletableDeferred<Reply>()
+        val started = AtomicBoolean(false)
         val callbackType = method.parameterTypes[CALLBACK_PARAMETER]
         val callback = Proxy.newProxyInstance(callbackType.classLoader, arrayOf(callbackType)) { proxy, invoked, args ->
             when (invoked.name) {
@@ -76,6 +86,7 @@ internal class PydevdSetNextStatement private constructor(
 
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
+                started.set(true)
                 method.invoke(process, context, target, callback)
             } catch (e: InvocationTargetException) {
                 reply.complete(Reply.Failed(describe(e.targetException)))
@@ -88,7 +99,11 @@ internal class PydevdSetNextStatement private constructor(
             }
         }
 
-        return withTimeoutOrNull(timeoutMs) { reply.await() } ?: Reply.NoReply
+        return withTimeoutOrNull(timeoutMs) {
+            JumpTargetConfirmation.awaitReplyOrTarget(reply, Reply.Accepted) {
+                started.get() && confirmsTarget()
+            }
+        } ?: Reply.NoReply
     }
 
     companion object {
@@ -97,7 +112,7 @@ internal class PydevdSetNextStatement private constructor(
 
         /**
          * The bridge for [debugProcess], or null when it has no `startSetNextStatement(XSuspendContext,
-         * XSourcePosition, <callback interface>)` — i.e. when it is not a pydevd debug process.
+         * XSourcePosition, <callback interface>)` entry point.
          */
         fun find(debugProcess: Any): PydevdSetNextStatement? {
             val method = debugProcess.javaClass.methods.firstOrNull { candidate ->

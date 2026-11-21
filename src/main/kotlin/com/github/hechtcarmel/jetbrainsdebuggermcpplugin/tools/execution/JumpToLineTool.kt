@@ -11,6 +11,7 @@ import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebugSessionListener
 import com.intellij.xdebugger.XDebuggerUtil
 import com.intellij.xdebugger.XSourcePosition
+import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XSuspendContext
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import kotlinx.coroutines.channels.Channel
@@ -27,9 +28,9 @@ import kotlinx.serialization.json.putJsonObject
  * another line of the current function without executing the lines in between.
  *
  * The platform has no language-agnostic API for this (`XDebugProcess` has none on any branch through
- * 2026.3), so support is per debugger. Today that means Python sessions on the pydevd backend,
- * through [PydevdSetNextStatement]. Every other debugger gets an error naming its debug process, so
- * a report of "not supported by X" says exactly which backend a future bridge has to cover.
+ * 2026.3), so support is per debugger, through the reflective [PydevdSetNextStatement] entry point.
+ * Backends without that method get an error naming the debug process. A backend that moves without
+ * the pydevd callback/pause sequence can instead be confirmed at the exact changed target.
  *
  * pydevd answers the request first and re-suspends the thread at the new line afterwards, so the
  * tool listens for that pause *before* sending the request and only reports success once the jumped
@@ -76,12 +77,13 @@ class JumpToLineTool : AbstractMcpTool() {
 
         // pydevd moves the thread that stopped — the suspend context's active stack — whatever frame or
         // thread select_stack_frame has put in front since. Every check below is made against that thread.
-        val suspendContext = session.suspendContext
-        val jumpedStack = suspendContext?.activeExecutionStack
-        val executionPoint = jumpedStack?.topFrame?.sourcePosition
+        val before = capturePause(session)
+        val suspendContext = before.context
+        val jumpedStack = before.stack
+        val executionPoint = before.position
 
-        val setNextStatement = PydevdSetNextStatement.find(session.debugProcess)
-            ?: return createErrorResult(unsupportedDebuggerMessage(session, executionPoint))
+        val setNextStatement = PydevdSetNextStatement.find(before.snapshot.process)
+            ?: return createErrorResult(readAction { unsupportedDebuggerMessage(session, executionPoint) })
 
         val virtualFile = VirtualFileResolver.resolve(filePath)
             ?: return createErrorResult(
@@ -96,10 +98,11 @@ class JumpToLineTool : AbstractMcpTool() {
 
         // pydevd receives only the line number and the name of the target's enclosing function — never
         // the file. A target elsewhere would move execution to that line number of the *current* file.
-        if (!isSameFile(executionPoint.file, virtualFile)) {
+        if (!readAction { isSameFile(executionPoint.file, virtualFile) }) {
+            val currentPosition = readAction { "${executionPoint.file.path}:${executionPoint.line + 1}" }
             return createErrorResult(
                 "Cannot jump to $filePath:$line: the target must be in the file of the current execution " +
-                    "point (${executionPoint.file.path}:${executionPoint.line + 1}). The debugger can only " +
+                    "point ($currentPosition). The debugger can only " +
                     "move execution within the current function."
             )
         }
@@ -107,10 +110,22 @@ class JumpToLineTool : AbstractMcpTool() {
         val target = XDebuggerUtil.getInstance().createPosition(virtualFile, line - 1)
             ?: return createErrorResult("Cannot create position for $filePath:$line")
 
-        // true for each pause, false once the session stops.
-        val sessionEvents = Channel<Boolean>(Channel.UNLIMITED)
+        val targetLocation = readAction { location(target) }
+        var confirmedAtTarget = false
+        val confirmsTarget: suspend () -> Boolean = {
+            JumpTargetConfirmation.confirmsMove(before.snapshot, capturePause(session).snapshot, targetLocation)
+                .also { if (it) confirmedAtTarget = true }
+        }
+
+        // Events wake the observer; state is also sampled because debugpy can update a frame
+        // without replacing its suspend context or delivering a sessionPaused/callback pair.
+        val sessionEvents = Channel<Boolean>(Channel.CONFLATED)
         val listener = object : XDebugSessionListener {
             override fun sessionPaused() {
+                sessionEvents.trySend(true)
+            }
+
+            override fun stackFrameChanged() {
                 sessionEvents.trySend(true)
             }
 
@@ -122,7 +137,7 @@ class JumpToLineTool : AbstractMcpTool() {
         // answering, so the pause can land before this coroutine has even read the answer.
         session.addSessionListener(listener)
         try {
-            when (val reply = setNextStatement.request(suspendContext, target, REPLY_TIMEOUT_MS)) {
+            when (val reply = setNextStatement.request(suspendContext, target, REPLY_TIMEOUT_MS, confirmsTarget)) {
                 is PydevdSetNextStatement.Reply.Refused ->
                     return createErrorResult("Cannot jump to $filePath:$line: ${reply.reason}")
                 is PydevdSetNextStatement.Reply.Failed ->
@@ -136,7 +151,9 @@ class JumpToLineTool : AbstractMcpTool() {
                 PydevdSetNextStatement.Reply.Accepted -> Unit
             }
 
-            return when (val outcome = awaitReposition(session, suspendContext, jumpedStack.displayName, sessionEvents)) {
+            val outcome = if (confirmedAtTarget) Reposition.Moved(target)
+                else awaitReposition(session, before, target, sessionEvents, confirmsTarget)
+            return when (outcome) {
                 Reposition.Stopped -> createErrorResult("The debug session ended during the jump")
                 null -> createErrorResult(
                     "The debugger accepted the jump to $filePath:$line but did not report the new position " +
@@ -147,12 +164,13 @@ class JumpToLineTool : AbstractMcpTool() {
                     sessionId = getSessionId(session),
                     action = "jump_to_line",
                     status = "success",
-                    message = successMessage(outcome.position, virtualFile, line),
+                    message = readAction { successMessage(outcome.position, virtualFile, line) },
                     newState = "paused"
                 ))
             }
         } finally {
             session.removeSessionListener(listener)
+            sessionEvents.close()
         }
     }
 
@@ -161,30 +179,61 @@ class JumpToLineTool : AbstractMcpTool() {
         data class Moved(val position: XSourcePosition?) : Reposition
     }
 
+    private data class PauseState(
+        val context: XSuspendContext?,
+        val stack: XExecutionStack?,
+        val position: XSourcePosition?,
+        val snapshot: JumpTargetConfirmation.Snapshot,
+    )
+
+    private suspend fun capturePause(session: XDebugSession): PauseState = readAction {
+        val stopped = session.isStopped
+        val paused = !stopped && session.isPaused
+        val context = if (paused) session.suspendContext else null
+        val stack = context?.activeExecutionStack
+        val position = stack?.topFrame?.sourcePosition
+        PauseState(context, stack, position, JumpTargetConfirmation.Snapshot(
+            session = session,
+            process = session.debugProcess,
+            thread = stack,
+            location = position?.let { location(it) },
+            paused = paused,
+            stopped = stopped,
+        ))
+    }
+
+    private fun location(position: XSourcePosition): JumpTargetConfirmation.Location =
+        JumpTargetConfirmation.Location((position.file.canonicalFile ?: position.file).url, position.line)
+
     /**
-     * Waits for the pause that reports where the jumped thread landed. Only a pause with a new suspend
-     * context whose active stack is the jumped thread counts: a late notification for the pause the
-     * jump started from, or another thread hitting a breakpoint meanwhile, is skipped.
+     * Exact-target state confirmation also works when a backend reuses its suspend context or
+     * only refreshes a stack frame. Preserve callback-acknowledged pydevd remapping (e.g. a blank
+     * target line) only after a fresh pause, in the same execution stack, at a changed location.
      */
     private suspend fun awaitReposition(
         session: XDebugSession,
-        before: XSuspendContext,
-        threadName: String,
+        before: PauseState,
+        target: XSourcePosition,
         sessionEvents: Channel<Boolean>,
+        confirmsTarget: suspend () -> Boolean,
     ): Reposition? = withTimeoutOrNull(REPOSITION_TIMEOUT_MS) {
-        var outcome: Reposition? = null
-        while (outcome == null) {
-            outcome = if (!sessionEvents.receive()) {
-                Reposition.Stopped
-            } else {
-                session.suspendContext
-                    ?.takeIf { it !== before }
-                    ?.activeExecutionStack
-                    ?.takeIf { it.displayName == threadName }
-                    ?.let { Reposition.Moved(it.topFrame?.sourcePosition) }
+        while (true) {
+            if (confirmsTarget()) return@withTimeoutOrNull Reposition.Moved(target)
+            if (session.isStopped) return@withTimeoutOrNull Reposition.Stopped
+            val event = withTimeoutOrNull(JumpTargetConfirmation.POLL_INTERVAL_MS) { sessionEvents.receive() }
+                ?: continue
+            if (!event) return@withTimeoutOrNull Reposition.Stopped
+            val current = capturePause(session)
+            if (current.snapshot.paused && current.context !== before.context &&
+                current.stack == before.stack && current.snapshot.process === before.snapshot.process &&
+                current.snapshot.location != null && current.snapshot.location != before.snapshot.location &&
+                current.snapshot.location.file == before.snapshot.location?.file
+            ) {
+                return@withTimeoutOrNull Reposition.Moved(current.position)
             }
         }
-        outcome
+        @Suppress("UNREACHABLE_CODE")
+        null
     }
 
     private fun successMessage(position: XSourcePosition?, targetFile: VirtualFile, targetLine: Int): String {

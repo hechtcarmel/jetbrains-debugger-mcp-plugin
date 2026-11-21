@@ -8,6 +8,7 @@ import com.intellij.xdebugger.XDebuggerUtil
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.frame.XSuspendContext
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The reflective half of `jump_to_line`, driven with stand-ins shaped like PyCharm's
@@ -29,6 +30,9 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
 
     open class ReplyingProcess(private val answer: (StandInCallback<Pair<Boolean, String>>) -> Unit) {
         @Volatile
+        var requests = 0
+
+        @Volatile
         var requestedLine: Int? = null
 
         @Volatile
@@ -39,6 +43,7 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
             sourcePosition: XSourcePosition,
             callback: StandInCallback<Pair<Boolean, String>>,
         ) {
+            requests++
             requestedContext = context
             requestedLine = sourcePosition.line
             answer(callback)
@@ -60,11 +65,15 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
         requireNotNull(XDebuggerUtil.getInstance().createPosition(file, 3))
     }
 
-    private fun request(process: Any, timeoutMs: Long = 5_000): Reply {
+    private fun request(
+        process: Any,
+        timeoutMs: Long = 5_000,
+        confirmsTarget: suspend () -> Boolean = { false },
+    ): Reply {
         val bridge = requireNotNull(PydevdSetNextStatement.find(process)) {
             "Expected a bridge for ${process.javaClass.simpleName}"
         }
-        return runBlocking { bridge.request(null, target, timeoutMs) }
+        return runBlocking { bridge.request(null, target, timeoutMs, confirmsTarget) }
     }
 
     // ── Discovery ───────────────────────────────────────────────────────────────────────
@@ -144,6 +153,30 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
             "NoReply must come from the timeout, not from waiting on the debugger",
             System.currentTimeMillis() - started < 5_000
         )
+    }
+
+    fun `test a confirmed move completes a callbackless request without retrying it`() {
+        val moved = AtomicBoolean(false)
+        val process = ReplyingProcess { moved.set(true) }
+        assertEquals(Reply.Accepted, request(process, confirmsTarget = { moved.get() }))
+        assertEquals("Only one debugger command may be sent", 1, process.requests)
+        assertEquals(3, process.requestedLine)
+    }
+
+    fun `test a callbackless request without a confirmed transition still times out`() {
+        val process = ReplyingProcess { }
+        assertEquals(Reply.NoReply, request(process, timeoutMs = 150, confirmsTarget = { false }))
+        assertEquals(1, process.requests)
+    }
+
+    fun `test a backend refusal remains a refusal with target observation enabled`() {
+        val moved = AtomicBoolean(false)
+        val process = ReplyingProcess {
+            it.ok(Pair(false, "Error: forbidden jump"))
+            moved.set(true)
+        }
+        assertEquals(Reply.Refused("forbidden jump"), request(process, confirmsTarget = { moved.get() }))
+        assertEquals(1, process.requests)
     }
 
     fun `test a reply from another thread is still delivered`() {
