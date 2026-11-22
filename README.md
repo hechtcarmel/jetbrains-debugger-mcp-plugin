@@ -299,6 +299,8 @@ workflow and select the option to reuse that configuration.
 | `jump_to_line` | Move the paused execution point to another line without running the code in between (Python/pydevd) |
 | `wait_for_pause` | Block until the session pauses (breakpoint, step, manual) and return full status |
 
+`jump_to_line` has confirmed completion support on Python/pydevd. A debugger refusal or error retains `isError: true` and its reason. Unknown completion (including debugpy) returns `isError: true`, `status: "completion_unverified"`, and no `newState`; the jump may have happened, may be pending, or may not have been applied. Do not automatically retry. Inspect the requested session with `get_debug_session_status` before deciding what to do next. Status inspection is observational and cannot establish the original thread identity. See [completion reporting](USAGE.md#jump_to_line).
+
 ### Stack & Thread Tools
 
 | Tool | Description |

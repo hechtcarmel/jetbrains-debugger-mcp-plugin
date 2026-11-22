@@ -3,12 +3,8 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.frame.XSuspendContext
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withTimeoutOrNull
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
-import java.lang.reflect.Proxy
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Reflective bridge to PyCharm's pydevd "Jump to Cursor":
@@ -28,6 +24,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * line and that function's name, never the file — and assigns `frame.f_lineno`, answering with
  * CPython's refusal text when the interpreter rejects the jump. On success it re-suspends the
  * thread at the new line, which reaches the IDE as a fresh `sessionPaused`.
+ *
+ * The installed PyCharm 263.7307.206 DAP entry point instead takes `(String) -> Unit` as an
+ * error-only callback and returns void. It has no success acknowledgment. [JumpRequestCallbacks]
+ * adapts that public Kotlin function shape, but neither return nor silence is acceptance.
  */
 internal class PydevdSetNextStatement private constructor(
     private val process: Any,
@@ -44,8 +44,8 @@ internal class PydevdSetNextStatement private constructor(
         /** The request could not be made, or the reply could not be read. */
         data class Failed(val reason: String) : Reply
 
-        /** Neither a reply nor an independently confirmed target move within the timeout. */
-        data object NoReply : Reply
+        /** Neither a reply nor a same-thread target proof; no claim about backend dispatch. */
+        data class CompletionUnverified(val invocation: JumpRequestObservation.Invocation) : Reply
     }
 
     /**
@@ -64,46 +64,31 @@ internal class PydevdSetNextStatement private constructor(
         timeoutMs: Long,
         confirmsTarget: suspend () -> Boolean = { false },
     ): Reply {
-        val reply = CompletableDeferred<Reply>()
-        val started = AtomicBoolean(false)
+        val observation = JumpRequestObservation<Reply>()
         val callbackType = method.parameterTypes[CALLBACK_PARAMETER]
-        val callback = Proxy.newProxyInstance(callbackType.classLoader, arrayOf(callbackType)) { proxy, invoked, args ->
-            when (invoked.name) {
-                "ok" -> {
-                    reply.complete(parseReply(args?.firstOrNull()))
-                    null
-                }
-                "error" -> {
-                    reply.complete(Reply.Failed(describe(args?.firstOrNull() as? Throwable)))
-                    null
-                }
-                "equals" -> proxy === args?.firstOrNull()
-                "hashCode" -> System.identityHashCode(proxy)
-                "toString" -> "jump_to_line reply callback"
-                else -> null
-            }
-        }
+        val callback = JumpRequestCallbacks.create(callbackType,
+            onOk = { observation.complete(parseReply(it)) },
+            onError = { observation.complete(Reply.Failed(describe(it))) },
+            onErrorMessage = { observation.complete(Reply.Failed(it.ifBlank { "the debugger reported an unspecified jump error" })) },
+        )
 
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                started.set(true)
+                observation.invocationStarted()
                 method.invoke(process, context, target, callback)
+                observation.invocationReturned()
             } catch (e: InvocationTargetException) {
-                reply.complete(Reply.Failed(describe(e.targetException)))
+                observation.complete(Reply.Failed(describe(e.targetException)))
             } catch (e: ReflectiveOperationException) {
-                reply.complete(Reply.Failed(describe(e)))
+                observation.complete(Reply.Failed(describe(e)))
             } catch (e: RuntimeException) {
                 // Method.invoke's own IllegalArgumentException and the like. No coroutine runs on this
                 // pooled thread, so there is no cancellation to propagate — only a reply to complete.
-                reply.complete(Reply.Failed(describe(e)))
+                observation.complete(Reply.Failed(describe(e)))
             }
         }
 
-        return withTimeoutOrNull(timeoutMs) {
-            JumpTargetConfirmation.awaitReplyOrTarget(reply, Reply.Accepted) {
-                started.get() && confirmsTarget()
-            }
-        } ?: Reply.NoReply
+        return observation.await(timeoutMs, Reply.Accepted, confirmsTarget) { Reply.CompletionUnverified(it) }
     }
 
     companion object {
@@ -118,10 +103,11 @@ internal class PydevdSetNextStatement private constructor(
             val method = debugProcess.javaClass.methods.firstOrNull { candidate ->
                 val parameters = candidate.parameterTypes
                 candidate.name == METHOD_NAME &&
+                    candidate.returnType == Void.TYPE &&
                     parameters.size == 3 &&
                     parameters[0].isAssignableFrom(XSuspendContext::class.java) &&
                     parameters[1].isAssignableFrom(XSourcePosition::class.java) &&
-                    parameters[CALLBACK_PARAMETER].isInterface
+                    JumpRequestCallbacks.supports(parameters[CALLBACK_PARAMETER])
             } ?: return null
             return PydevdSetNextStatement(debugProcess, method)
         }

@@ -18,8 +18,9 @@ internal object JumpTargetConfirmation {
 
     /**
      * A missing callback/event is not success. Only a changed top-frame location at the exact
-     * requested target in the same session/process/thread confirms it. Thread equality uses the
-     * backend's execution-stack identity, never the UI display name (which need not be unique).
+     * requested target in the same session/process/thread confirms it. Stack equality is not a
+     * generic cross-pause thread-ID contract: unknown or unequal wrappers stay unverified.
+     * Never substitute a UI display name (which need not be unique) or hash code for identity.
      */
     fun confirmsMove(before: Snapshot, current: Snapshot, target: Location): Boolean =
         before.paused && !before.stopped && current.paused && !current.stopped &&

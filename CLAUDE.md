@@ -201,12 +201,14 @@ are the only failure signal a client gets. Representative examples:
 - `File not found: <path>. For files inside JAR archives, use the '!/' separator ...`
 - `Cannot set breakpoint at <path>:<line> (not a valid breakpoint location)`
 
-**Project resolution** is the one place that returns a structured payload — a JSON object with
+**Project resolution** returns a structured payload — a JSON object with
 `error`, `message` and `available_projects` keys, where `error` is one of:
 
 - `no_project_open` - No project is open in the IDE
 - `project_not_found` - No open project matches the supplied `project_path`
 - `multiple_projects_open` - Several projects are open and `project_path` was omitted
+
+`jump_to_line` also returns JSON text and `structuredContent` when completion is unknown: `status: "completion_unverified"`, the requested `sessionId`, `action` and `message`, with no `newState`. It keeps `isError: true` because the tool could not verify completion; this does not prove the jump failed. Never automatically retry this outcome. Authoritative debugger refusals/errors and confirmed pydevd success retain their existing behavior.
 
 > Earlier revisions of this file also listed `session_not_found`, `session_not_paused`,
 > `breakpoint_not_found`, `invalid_location` and `evaluation_error` as structured error codes. No
@@ -331,12 +333,16 @@ Stated plainly so nobody mistakes the suite for more than it is:
   registration. This is a limited loading smoke test, not a complete Android-absent IDE environment.
   Actual device attachment and Native/Hybrid debuggers require manual validation; installed APIs
   must remain binary-compatible with the compilation target.
-- **`jump_to_line` works on pydevd only.** The platform has no language-agnostic
-  "set next statement" API, and the tool reaches `PyDebugProcess.startSetNextStatement`
-  reflectively. PyCharm's debugpy backend (the default for local Python 3.9+ interpreters since
-  2026.2), CLion/RustRover and Rider all have the feature in closed-source code and get an error
-  naming their debug process. The IDE computes the target's function name from PSI, so jumps
-  inside class bodies and generator expressions are refused even where CPython would allow them.
+- **Confirmed `jump_to_line` support is pydevd.** The platform has no language-agnostic
+  "set next statement" API; the tool uses the public backend entry point reflectively. The
+  inspected PyCharm 263.7307.206 debugpy method takes a public `(String) -> Unit` failure-only
+  callback and returns void. The adapter forwards its errors but does not treat return or silence
+  as success. Without a supported same-thread completion signal, it returns `completion_unverified`.
+  No native thread ID, internal RPC identity conversion, display name or hash is used to establish
+  success. Existing pydevd acknowledgment and observed same-thread remapping remain supported.
+  Other backends without a supported entry point get an unsupported-debugger error. Pydevd computes
+  the function name from PSI, so class-body/generator-expression jumps can be refused even where
+  CPython would allow them.
 - **`BreakpointHitInfo.hitCount` is always 0.** The language-agnostic `XBreakpoint` API exposes
   no hit-count accessor; hit counts live in language-specific debugger implementations.
 - **Pause-reason detection is a file/line heuristic.** It matches the top frame's position against

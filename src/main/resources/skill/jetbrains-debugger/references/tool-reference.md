@@ -316,9 +316,11 @@ Move the paused execution point to another line **without running the code in be
 | `line` | integer | **Yes** | 1-based target line in the current function (min: 1) |
 | `project_path` | string | No | Project path |
 
-**Requires:** Session paused. **New state:** "paused" (at the target line; the tool returns once the debugger reports the new position)
+**Requires:** Session paused. **New state on confirmed success:** "paused" (only after the jumped thread is observed at its new position).
 
-**Supported debuggers:** Python sessions on the pydevd backend. Any other debugger — Java/Kotlin (the JVM cannot move the execution point), JavaScript, PHP, Go, native, and Python's debugpy backend — returns an error naming the debugger.
+**Confirmed support:** Python sessions on pydevd. Backends without a supported jump entry point return an error naming the debugger. Debugpy's error-only callback does not confirm successful completion through the public SDK.
+
+**Outcomes:** Confirmed completion returns `isError: false`, `status: "success"`, and `newState: "paused"`. Authoritative refusal/errors retain `isError: true` and their reason. Unknown completion returns `isError: true`, `status: "completion_unverified"`, and no `newState`, as matching JSON text and `structuredContent`. The jump may have happened, may be pending, or may not have been applied. A method return is not proof of dispatch. Do not automatically retry; inspect the requested session first. A matching line alone does not prove the same thread completed the jump. Errors arriving after the bounded response cannot revise it. Status inspection is observational and cannot establish the original thread identity.
 
 **Limits:** Only within the current function of the paused thread (its top frame, whatever `select_stack_frame` selected) and only in that file. Python refuses jumps into a `for` loop body or an `except` block, and reports why. Right after `step_out` or a step past a `return` the thread is not at the start of a line and the jump is refused — `step_over` once, then retry. A blank or comment line lands on the next line with code. Skipped code leaves variables stale or unassigned (Python 3.12+ sets unassigned locals to `None`); skipped `finally` blocks and `with` exits do not run; jumping back re-runs side effects.
 

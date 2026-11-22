@@ -141,7 +141,7 @@ is bounded to 128 records per project; see the tool reference for lifecycle limi
 4. step_over, then wait_for_pause -- the line executes again with the corrected input
    (or jump_to_line past a crashing or side-effecting call to skip it)
 ```
-`jump_to_line` only moves within the current function, and only where the debugger supports it (currently Python on the pydevd backend); elsewhere it returns an error.
+`jump_to_line` only moves within the current function. Confirmed support is Python on pydevd. A backend refusal/error retains `isError: true` and its reason. `isError: true` with `status: "completion_unverified"` means completion is unknown, not that the jump definitely failed; it claims no new state. Do not automatically retry. Inspect the requested session first, and do not treat a matching line on an unknown/different thread as confirmation. This includes debugpy when its error-only callback provides no reliable completion signal. Status inspection is observational and cannot establish the original thread identity.
 
 ## Common Mistakes to Avoid
 

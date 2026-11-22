@@ -43,9 +43,9 @@ class JumpToLineTool : AbstractMcpTool() {
     override val name = "jump_to_line"
 
     override val description = """
-        Moves the paused execution point to another line WITHOUT running the code in between (also known as Set Next Statement, Jump to Cursor, or Set Execution Point). Unlike run_to_line, skipped lines never execute, and jumping to an earlier line executes it again. The session stays paused at the new line.
+        Moves the paused execution point to another line WITHOUT running the code in between (also known as Set Next Statement, Jump to Cursor, or Set Execution Point). Unlike run_to_line, skipped lines never execute, and jumping to an earlier line executes it again. Confirmed success leaves the session paused at the new line.
         Use to retry a block after fixing a value with set_variable, or to skip a call that crashes or has side effects, without restarting the session.
-        Works only inside the current function of the thread that paused (its top stack frame, regardless of select_stack_frame), and only where the debugger supports it: currently Python sessions on the pydevd debugger backend. Other debuggers, including Java/Kotlin and Python's debugpy backend, return an error.
+        Works only inside the current function of the thread that paused (its top stack frame, regardless of select_stack_frame). Confirmed support is Python on the pydevd backend. Backends without a supported jump entry point return an error. If completion cannot be verified (including Python debugpy), returns isError: true with status: completion_unverified, without claiming success or a new state. Do not automatically retry: inspect the requested session first; a matching line alone does not prove same-thread completion. Status inspection is observational and cannot establish the original thread identity.
         Skipped code leaves variables stale or unassigned (Python 3.12+ sets unassigned locals to None), jumping back re-runs side effects, and skipped 'finally' blocks or 'with' exits do not run. Python refuses jumps into a 'for' loop body or an 'except' block, and a thread stopped right after step_out or a step past a 'return' must step once more before it can jump. A target line without code (blank or comment) lands on the next line that has code.
     """.trimIndent()
 
@@ -117,8 +117,8 @@ class JumpToLineTool : AbstractMcpTool() {
                 .also { if (it) confirmedAtTarget = true }
         }
 
-        // Events wake the observer; state is also sampled because debugpy can update a frame
-        // without replacing its suspend context or delivering a sessionPaused/callback pair.
+        // Events wake the observer; bounded state sampling also tolerates a missing event.
+        // Neither path confirms a move without the captured session/process/thread guards.
         val sessionEvents = Channel<Boolean>(Channel.CONFLATED)
         val listener = object : XDebugSessionListener {
             override fun sessionPaused() {
@@ -142,12 +142,8 @@ class JumpToLineTool : AbstractMcpTool() {
                     return createErrorResult("Cannot jump to $filePath:$line: ${reply.reason}")
                 is PydevdSetNextStatement.Reply.Failed ->
                     return createErrorResult("Failed to jump to line: ${reply.reason}")
-                PydevdSetNextStatement.Reply.NoReply ->
-                    return createErrorResult(
-                        "The debugger did not answer the jump request within ${REPLY_TIMEOUT_MS / 1000}s; it may " +
-                            "still apply it. Check where execution is paused with get_debug_session_status " +
-                            "before retrying."
-                    )
+                is PydevdSetNextStatement.Reply.CompletionUnverified ->
+                    return JumpCompletionResult.unverified(getSessionId(session), JumpRequestObservation.unverifiedMessage(reply.invocation))
                 PydevdSetNextStatement.Reply.Accepted -> Unit
             }
 
@@ -155,10 +151,11 @@ class JumpToLineTool : AbstractMcpTool() {
                 else awaitReposition(session, before, target, sessionEvents, confirmsTarget)
             return when (outcome) {
                 Reposition.Stopped -> createErrorResult("The debug session ended during the jump")
-                null -> createErrorResult(
-                    "The debugger accepted the jump to $filePath:$line but did not report the new position " +
-                        "within ${REPOSITION_TIMEOUT_MS / 1000}s. Call get_debug_session_status to see where " +
-                        "execution is before continuing."
+                null -> JumpCompletionResult.unverified(getSessionId(session),
+                    "The debugger accepted the jump request, but its new position on the same thread could not " +
+                        "be verified. Do not automatically retry. Inspect the requested session with " +
+                        "get_debug_session_status before deciding what to do next; a matching line alone " +
+                        "does not confirm completion on the same thread."
                 )
                 is Reposition.Moved -> createJsonResult(ExecutionControlResult(
                     sessionId = getSessionId(session),
