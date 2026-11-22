@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Confirm `jump_to_line` from the exact changed target in the same debug session, process and thread when a Python backend omits the expected callback or pause notification; preserve bounded timeouts for unconfirmed moves (#76).
+
 ## [5.5.1] - 2026-11-16
 
 ### Fixed

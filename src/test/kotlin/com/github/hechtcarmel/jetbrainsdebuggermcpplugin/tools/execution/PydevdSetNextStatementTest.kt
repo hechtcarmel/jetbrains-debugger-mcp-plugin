@@ -8,6 +8,7 @@ import com.intellij.xdebugger.XDebuggerUtil
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.frame.XSuspendContext
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The reflective half of `jump_to_line`, driven with stand-ins shaped like PyCharm's
@@ -29,6 +30,9 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
 
     open class ReplyingProcess(private val answer: (StandInCallback<Pair<Boolean, String>>) -> Unit) {
         @Volatile
+        var requests = 0
+
+        @Volatile
         var requestedLine: Int? = null
 
         @Volatile
@@ -39,6 +43,7 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
             sourcePosition: XSourcePosition,
             callback: StandInCallback<Pair<Boolean, String>>,
         ) {
+            requests++
             requestedContext = context
             requestedLine = sourcePosition.line
             answer(callback)
@@ -55,16 +60,28 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
         fun startSetNextStatement(line: Int, callback: StandInCallback<Pair<Boolean, String>>) = Unit
     }
 
+    interface UnknownCallback { fun notify(value: String) }
+    class UnknownCallbackProcess {
+        fun startSetNextStatement(context: XSuspendContext?, position: XSourcePosition, callback: UnknownCallback) = Unit
+    }
+    class NonVoidProcess {
+        fun startSetNextStatement(context: XSuspendContext?, position: XSourcePosition, onError: (String) -> Unit): Boolean = true
+    }
+
     private val target: XSourcePosition by lazy {
         val file = LightVirtualFile("target.py", "total = 0\nfor i in range(3):\n    total += i\nprint(total)\n")
         requireNotNull(XDebuggerUtil.getInstance().createPosition(file, 3))
     }
 
-    private fun request(process: Any, timeoutMs: Long = 5_000): Reply {
+    private fun request(
+        process: Any,
+        timeoutMs: Long = 5_000,
+        confirmsTarget: suspend () -> Boolean = { false },
+    ): Reply {
         val bridge = requireNotNull(PydevdSetNextStatement.find(process)) {
             "Expected a bridge for ${process.javaClass.simpleName}"
         }
-        return runBlocking { bridge.request(null, target, timeoutMs) }
+        return runBlocking { bridge.request(null, target, timeoutMs, confirmsTarget) }
     }
 
     // ── Discovery ───────────────────────────────────────────────────────────────────────
@@ -76,6 +93,8 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
 
     fun `test a startSetNextStatement with a different parameter shape is not mistaken for pydevd`() {
         assertNull(PydevdSetNextStatement.find(WrongShapeProcess()))
+        assertNull(PydevdSetNextStatement.find(UnknownCallbackProcess()))
+        assertNull(PydevdSetNextStatement.find(NonVoidProcess()))
     }
 
     fun `test the method is found on a subclass as with the pydevd remote debug process`() {
@@ -137,13 +156,37 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
         )
     }
 
-    fun `test a debugger that never calls back times out as NoReply`() {
+    fun `test a debugger that never calls back has unverified completion`() {
         val started = System.currentTimeMillis()
-        assertEquals(Reply.NoReply, request(ReplyingProcess { }, timeoutMs = 300))
+        assertEquals(Reply.CompletionUnverified(JumpRequestObservation.Invocation.RETURNED), request(ReplyingProcess { }, timeoutMs = 300))
         assertTrue(
-            "NoReply must come from the timeout, not from waiting on the debugger",
+            "Unverified completion must come from the observation timeout, not from waiting on the debugger",
             System.currentTimeMillis() - started < 5_000
         )
+    }
+
+    fun `test a confirmed move completes a callbackless request without retrying it`() {
+        val moved = AtomicBoolean(false)
+        val process = ReplyingProcess { moved.set(true) }
+        assertEquals(Reply.Accepted, request(process, confirmsTarget = { moved.get() }))
+        assertEquals("Only one debugger command may be sent", 1, process.requests)
+        assertEquals(3, process.requestedLine)
+    }
+
+    fun `test a callbackless request without a confirmed transition still times out`() {
+        val process = ReplyingProcess { }
+        assertEquals(Reply.CompletionUnverified(JumpRequestObservation.Invocation.RETURNED), request(process, timeoutMs = 150, confirmsTarget = { false }))
+        assertEquals(1, process.requests)
+    }
+
+    fun `test a backend refusal remains a refusal with target observation enabled`() {
+        val moved = AtomicBoolean(false)
+        val process = ReplyingProcess {
+            it.ok(Pair(false, "Error: forbidden jump"))
+            moved.set(true)
+        }
+        assertEquals(Reply.Refused("forbidden jump"), request(process, confirmsTarget = { moved.get() }))
+        assertEquals(1, process.requests)
     }
 
     fun `test a reply from another thread is still delivered`() {
@@ -151,5 +194,34 @@ class PydevdSetNextStatementTest : BasePlatformTestCase() {
             Thread { callback.ok(Pair(true, "Error")) }.start()
         }
         assertEquals(Reply.Accepted, request(process))
+    }
+
+    class ErrorOnlyProcess(private val answer: ((String) -> Unit) -> Unit) {
+        @Volatile var requests = 0
+        fun startSetNextStatement(context: XSuspendContext?, position: XSourcePosition, onError: (String) -> Unit) {
+            requests++
+            answer(onError)
+        }
+    }
+
+    fun `test Kotlin error only callback shape is wired through actual bridge`() {
+        var worker: Thread? = null
+        val process = ErrorOnlyProcess { onError -> worker = Thread { onError("exact asynchronous error") }.apply { start() } }
+        try {
+            assertEquals(Reply.Failed("exact asynchronous error"), request(process))
+            assertEquals(1, process.requests)
+        } finally {
+            worker?.join(5_000)
+        }
+    }
+
+    fun `test Kotlin normal return without completion is unverified and never retried`() {
+        val process = ErrorOnlyProcess { }
+        assertEquals(Reply.CompletionUnverified(JumpRequestObservation.Invocation.RETURNED), request(process, timeoutMs = 300))
+        assertEquals(1, process.requests)
+    }
+
+    fun `test Kotlin empty error is still an authoritative failure`() {
+        assertEquals(Reply.Failed("the debugger reported an unspecified jump error"), request(ErrorOnlyProcess { it("") }))
     }
 }

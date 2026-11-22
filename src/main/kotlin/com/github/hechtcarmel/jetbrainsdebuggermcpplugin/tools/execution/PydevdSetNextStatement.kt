@@ -3,11 +3,8 @@ package com.github.hechtcarmel.jetbrainsdebuggermcpplugin.tools.execution
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.xdebugger.XSourcePosition
 import com.intellij.xdebugger.frame.XSuspendContext
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withTimeoutOrNull
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
-import java.lang.reflect.Proxy
 
 /**
  * Reflective bridge to PyCharm's pydevd "Jump to Cursor":
@@ -19,7 +16,7 @@ import java.lang.reflect.Proxy
  * action and its debugger test harness call. It is reached reflectively, matched by name and
  * parameter shape on whatever the session's debug process is, so this plugin needs no compile-time
  * dependency on the Python plugin and keeps loading in IDEs without it. Debug processes that do not
- * have the method (the JVM debugger, the debugpy/DAP backend, native debuggers) get no bridge, and
+ * have the method (for example, the JVM debugger and native debuggers) get no bridge, and
  * [find] returns null for them.
  *
  * What pydevd does with the request (`python/helpers/pydev/pydevd.py`, `set_next_statement`): it
@@ -27,6 +24,10 @@ import java.lang.reflect.Proxy
  * line and that function's name, never the file — and assigns `frame.f_lineno`, answering with
  * CPython's refusal text when the interpreter rejects the jump. On success it re-suspends the
  * thread at the new line, which reaches the IDE as a fresh `sessionPaused`.
+ *
+ * The installed PyCharm 263.7307.206 DAP entry point instead takes `(String) -> Unit` as an
+ * error-only callback and returns void. It has no success acknowledgment. [JumpRequestCallbacks]
+ * adapts that public Kotlin function shape, but neither return nor silence is acceptance.
  */
 internal class PydevdSetNextStatement private constructor(
     private val process: Any,
@@ -43,8 +44,8 @@ internal class PydevdSetNextStatement private constructor(
         /** The request could not be made, or the reply could not be read. */
         data class Failed(val reason: String) : Reply
 
-        /** No answer within the timeout. */
-        data object NoReply : Reply
+        /** Neither a reply nor a same-thread target proof; no claim about backend dispatch. */
+        data class CompletionUnverified(val invocation: JumpRequestObservation.Invocation) : Reply
     }
 
     /**
@@ -53,42 +54,41 @@ internal class PydevdSetNextStatement private constructor(
      * `startSetNextStatement` blocks on the debugger socket until pydevd answers (its own limit is
      * 60 s) and resolves the target's enclosing function under a read action, so it runs on a pooled
      * thread — never on the EDT, and never on this coroutine, which gives up after [timeoutMs].
+     * A backend can move without completing this callback. The caller can
+     * confirm the exact changed target on the captured session/thread instead; a sent request or
+     * an unchanged pause is never treated as acceptance.
      */
-    suspend fun request(context: XSuspendContext?, target: XSourcePosition, timeoutMs: Long): Reply {
-        val reply = CompletableDeferred<Reply>()
+    suspend fun request(
+        context: XSuspendContext?,
+        target: XSourcePosition,
+        timeoutMs: Long,
+        confirmsTarget: suspend () -> Boolean = { false },
+    ): Reply {
+        val observation = JumpRequestObservation<Reply>()
         val callbackType = method.parameterTypes[CALLBACK_PARAMETER]
-        val callback = Proxy.newProxyInstance(callbackType.classLoader, arrayOf(callbackType)) { proxy, invoked, args ->
-            when (invoked.name) {
-                "ok" -> {
-                    reply.complete(parseReply(args?.firstOrNull()))
-                    null
-                }
-                "error" -> {
-                    reply.complete(Reply.Failed(describe(args?.firstOrNull() as? Throwable)))
-                    null
-                }
-                "equals" -> proxy === args?.firstOrNull()
-                "hashCode" -> System.identityHashCode(proxy)
-                "toString" -> "jump_to_line reply callback"
-                else -> null
-            }
-        }
+        val callback = JumpRequestCallbacks.create(callbackType,
+            onOk = { observation.complete(parseReply(it)) },
+            onError = { observation.complete(Reply.Failed(describe(it))) },
+            onErrorMessage = { observation.complete(Reply.Failed(it.ifBlank { "the debugger reported an unspecified jump error" })) },
+        )
 
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
+                observation.invocationStarted()
                 method.invoke(process, context, target, callback)
+                observation.invocationReturned()
             } catch (e: InvocationTargetException) {
-                reply.complete(Reply.Failed(describe(e.targetException)))
+                observation.complete(Reply.Failed(describe(e.targetException)))
             } catch (e: ReflectiveOperationException) {
-                reply.complete(Reply.Failed(describe(e)))
+                observation.complete(Reply.Failed(describe(e)))
             } catch (e: RuntimeException) {
                 // Method.invoke's own IllegalArgumentException and the like. No coroutine runs on this
                 // pooled thread, so there is no cancellation to propagate — only a reply to complete.
-                reply.complete(Reply.Failed(describe(e)))
+                observation.complete(Reply.Failed(describe(e)))
             }
         }
 
-        return withTimeoutOrNull(timeoutMs) { reply.await() } ?: Reply.NoReply
+        return observation.await(timeoutMs, Reply.Accepted, confirmsTarget) { Reply.CompletionUnverified(it) }
     }
 
     companion object {
@@ -97,16 +97,17 @@ internal class PydevdSetNextStatement private constructor(
 
         /**
          * The bridge for [debugProcess], or null when it has no `startSetNextStatement(XSuspendContext,
-         * XSourcePosition, <callback interface>)` — i.e. when it is not a pydevd debug process.
+         * XSourcePosition, <callback interface>)` entry point.
          */
         fun find(debugProcess: Any): PydevdSetNextStatement? {
             val method = debugProcess.javaClass.methods.firstOrNull { candidate ->
                 val parameters = candidate.parameterTypes
                 candidate.name == METHOD_NAME &&
+                    candidate.returnType == Void.TYPE &&
                     parameters.size == 3 &&
                     parameters[0].isAssignableFrom(XSuspendContext::class.java) &&
                     parameters[1].isAssignableFrom(XSourcePosition::class.java) &&
-                    parameters[CALLBACK_PARAMETER].isInterface
+                    JumpRequestCallbacks.supports(parameters[CALLBACK_PARAMETER])
             } ?: return null
             return PydevdSetNextStatement(debugProcess, method)
         }

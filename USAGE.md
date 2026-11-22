@@ -1167,13 +1167,20 @@ Continues execution until the specified line is reached.
 
 ### jump_to_line
 
-Moves the paused execution point to another line **without running the code in between** — PyCharm's "Jump to Cursor", Visual Studio's "Set Next Statement". Skipped lines never execute, and jumping to an earlier line executes it again. The session stays paused at the new line.
+Moves the paused execution point to another line **without running the code in between** — PyCharm's "Jump to Cursor", Visual Studio's "Set Next Statement". Skipped lines never execute, and jumping to an earlier line executes it again. Confirmed success leaves the session paused at the new line.
 
 **Use when:**
 - Re-running a block after correcting a value with `set_variable`
 - Skipping a call that crashes or has side effects, without restarting the session
 
-**Supported debuggers:** Python sessions on the pydevd backend. Other debuggers (Java/Kotlin, JavaScript, PHP, Go, native, Python's debugpy backend) return an error naming the debugger.
+**Confirmed support:** Python sessions on the pydevd backend. Backends without a supported jump entry point return an error naming the debugger. PyCharm 2026.3's debugpy entry point can apply a jump but has an error-only callback and does not expose a reliable same-thread completion signal through the public SDK. A matching line alone is not proof of completion on the requested thread.
+
+**Completion reporting:**
+- Confirmed completion returns `isError: false`, `status: "success"`, and `newState: "paused"`.
+- A debugger refusal or error received during observation returns `isError: true` with its reason.
+- If completion cannot be verified, the tool returns `isError: true` and `status: "completion_unverified"`, with no `newState`. This does **not** mean the jump definitely failed: it may have happened, may still be pending, or may not have been applied. The message distinguishes a queued invocation, an invocation still running, and one that returned; none proves backend dispatch. **Do not automatically retry.** Inspect the requested session with `get_debug_session_status` before deciding what to do next. A late backend error cannot revise a response already returned.
+
+The tool invokes the debugger once per call. Unverified completion is reported as both JSON text and `structuredContent`; the conservative error flag also prevents existing clients and command history from treating it as a confirmed success. Status inspection is observational and cannot establish the original thread identity.
 
 **Limits:** Only within the current function of the paused thread (its top frame) and only in that file. Python refuses jumps into a `for` loop body or an `except` block. Right after `step_out` or a step past a `return` the thread is not at the start of a line, so the jump is refused until it steps once more. A blank or comment line lands on the next line with code. Skipped code leaves variables stale or unassigned (Python 3.12+ sets unassigned locals to `None`), skipped `finally` blocks and `with` exits do not run, and jumping back re-runs side effects.
 
@@ -1210,6 +1217,17 @@ Moves the paused execution point to another line **without running the code in b
   "status": "success",
   "message": "Execution point moved to /Users/dev/project/app/orders.py:42. The skipped lines did not run.",
   "newState": "paused"
+}
+```
+
+**Example unverified result body** (`isError: true`; also present as JSON text):
+
+```json
+{
+  "sessionId": "0f8c2a61-5d8e-4f3b-9a57-2c1e7b4d9e10",
+  "action": "jump_to_line",
+  "status": "completion_unverified",
+  "message": "The debugger's jump method was invoked once and returned; that does not confirm that it dispatched or applied the jump. Completion could not be verified: the jump may have happened, may be pending, or may not have been applied. Do not automatically retry. Inspect the requested session with get_debug_session_status before deciding what to do next; a matching line alone does not confirm completion on the same thread."
 }
 ```
 
