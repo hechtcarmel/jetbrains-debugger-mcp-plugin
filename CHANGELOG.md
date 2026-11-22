@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [5.5.2] - 2026-11-22
+
 ### Fixed
 
 - Confirm `jump_to_line` from the exact changed target in the same debug session, process and thread when a Python backend omits the expected callback or pause notification; preserve bounded timeouts for unconfirmed moves (#76).
@@ -321,7 +323,8 @@
 - MCP protocol version 2024-11-05
 - Compatible with all JetBrains IDEs that support XDebugger (IntelliJ IDEA, PyCharm, WebStorm, GoLand, PhpStorm, RubyMine, CLion, Rider, Android Studio)
 
-[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.5.1...HEAD
+[Unreleased]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.5.2...HEAD
+[5.5.2]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.5.1...5.5.2
 [5.5.1]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.5.0...5.5.1
 [5.5.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.4.0...5.5.0
 [5.4.0]: https://github.com/hechtcarmel/jetbrains-debugger-mcp-plugin/compare/5.3.0...5.4.0
